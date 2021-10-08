@@ -1,2 +1,2 @@
 # website
-https://frankly-blue.github.io/website/
+https://github.com/frankly-blue/website.git
