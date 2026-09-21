@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bounce Golf</title>
+<style>
+  :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:#153a2b;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);touch-action:manipulation}
+  body{display:flex;justify-content:center;min-height:100vh;padding:8px}
+  #gameShell{width:min(100%,980px)}
+  #hud{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:7px}
+  .hudBox{background:rgba(255,248,230,.96);border-radius:11px;padding:7px 6px;text-align:center;font-weight:900;font-size:13px;box-shadow:0 2px 0 rgba(0,0,0,.13)}
+  #stage{position:relative;background:#9fd6f6;border:4px solid #f6e8bd;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+  canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#a8dcff}
+  #message{position:absolute;left:50%;top:12%;transform:translateX(-50%);background:rgba(255,248,230,.95);padding:8px 14px;border-radius:999px;font-weight:900;opacity:0;transition:.18s;pointer-events:none;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+  #message.show{opacity:1}
+  #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(16,42,31,.78);z-index:10}
+  #overlay.hidden{display:none}
+  .card{width:min(92%,460px);background:#fff9e8;border-radius:22px;padding:22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .card h1,.card h2{margin:0 0 8px}.card p{margin:7px 0 15px;color:#4e675b;font-weight:650}
+  .card button{width:100%;margin-top:8px}
+  #controls{display:grid;grid-template-columns:1fr 1.25fr;gap:7px;margin-top:8px}
+  #aimControls{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  button{border:0;border-radius:14px;min-height:58px;padding:10px 12px;font:900 16px system-ui;color:white;background:#2d6749;box-shadow:0 3px 0 #173b2a;touch-action:none}
+  button:active{transform:translateY(2px);box-shadow:0 1px 0 #173b2a}
+  #hitBtn{background:#e2ab35;color:#27301f;box-shadow:0 3px 0 #9d711a;font-size:20px}
+  #secondaryControls{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  #secondaryControls button{min-height:44px;background:#486154;font-size:14px;box-shadow:0 2px 0 #28392f}
+  #powerWrap{grid-column:1/-1;background:rgba(255,248,230,.98);border-radius:12px;padding:7px 9px}
+  #powerBar{height:12px;border-radius:999px;background:#d7d1bd;overflow:hidden}
+  #powerFill{height:100%;width:20%;background:linear-gradient(90deg,#6dbd5f,#edc24e,#dc6648)}
+  #powerText{text-align:center;font-size:12px;font-weight:900;margin-top:4px}
+  #tip{text-align:center;color:#eaf7ee;font-size:12px;font-weight:700;margin:6px 0 2px}
+  .scoregrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}.scorecell{background:#f0ead6;border-radius:10px;padding:7px;font-size:12px}.scorecell strong{display:block;font-size:18px}
+  @media (orientation:landscape) and (max-height:650px){
+    body{padding:3px}.hudBox{font-size:11px;padding:4px}.hudBox:nth-child(5){display:none}#stage{border-width:3px}
+    #controls{grid-template-columns:1fr 1.2fr;margin-top:4px;gap:5px}button{min-height:46px;font-size:14px}#hitBtn{font-size:17px}
+    #secondaryControls{display:none}#powerWrap{padding:5px}#tip{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="gameShell">
+  <div id="hud">
+    <div class="hudBox" id="holeHud">Hole 1/9</div>
+    <div class="hudBox" id="parHud">Par 4</div>
+    <div class="hudBox" id="strokeHud">Strokes 0</div>
+    <div class="hudBox" id="scoreHud">Score E</div>
+    <div class="hudBox" id="dirHud">Goal ↑</div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game" width="960" height="540" aria-label="Side-view Bounce Golf course"></canvas>
+    <div id="message" aria-live="polite"></div>
+    <div id="overlay">
+      <div class="card" id="startCard">
+        <div style="font-size:50px">⛳</div>
+        <h1>Bounce Golf</h1>
+        <p>Side-view platform golf. Climb grassy cliffs, cross floating islands and drop down through the course to reach the cup.</p>
+        <button id="startBtn">Play 9 Holes</button>
+      </div>
+      <div class="card" id="pauseCard" style="display:none">
+        <h2>Paused</h2>
+        <button id="continueBtn">Continue</button>
+        <button id="restartHoleBtn">Restart Hole</button>
+        <button id="titleBtn">Title Screen</button>
+      </div>
+      <div class="card" id="endCard" style="display:none">
+        <div style="font-size:48px">🏆</div>
+        <h2>Round Complete</h2>
+        <p id="endSummary"></p>
+        <div id="scoreGrid" class="scoregrid"></div>
+        <button id="againBtn">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div id="aimControls">
+      <button id="leftBtn">◀ AIM</button>
+      <button id="rightBtn">AIM ▶</button>
+    </div>
+    <button id="hitBtn">HOLD TO HIT</button>
+    <div id="powerWrap"><div id="powerBar"><div id="powerFill"></div></div><div id="powerText">Power 20%</div></div>
+    <div id="secondaryControls"><button id="resetBtn">Reset Ball</button><button id="pauseBtn">Pause</button></div>
+  </div>
+  <div id="tip">Tap anywhere to aim. Hold HIT to charge, release to strike. Grass gives a soft, natural landing. If the ball falls below the islands it is lost and that stroke still counts. Side walls and cliff faces can still be used for bank shots.</div>
+</div>
+<script>
+(()=>{
+  const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const holeHud=document.getElementById('holeHud'),parHud=document.getElementById('parHud'),strokeHud=document.getElementById('strokeHud'),scoreHud=document.getElementById('scoreHud'),dirHud=document.getElementById('dirHud');
+  const message=document.getElementById('message'),overlay=document.getElementById('overlay');
+  const startCard=document.getElementById('startCard'),pauseCard=document.getElementById('pauseCard'),endCard=document.getElementById('endCard');
+  const startBtn=document.getElementById('startBtn'),againBtn=document.getElementById('againBtn'),continueBtn=document.getElementById('continueBtn'),restartHoleBtn=document.getElementById('restartHoleBtn'),titleBtn=document.getElementById('titleBtn');
+  const leftBtn=document.getElementById('leftBtn'),rightBtn=document.getElementById('rightBtn'),hitBtn=document.getElementById('hitBtn'),resetBtn=document.getElementById('resetBtn'),pauseBtn=document.getElementById('pauseBtn');
+  const powerFill=document.getElementById('powerFill'),powerText=document.getElementById('powerText'),endSummary=document.getElementById('endSummary'),scoreGrid=document.getElementById('scoreGrid');
+
+  const GRAVITY=620, BALL_R=10;
+  const holes=[
+    {par:4,start:{x:105,y:468},cup:{x:808,y:225},platforms:[
+      {x:30,y:480,w:250,h:60,trees:[.72],flowers:true},
+      {x:300,y:365,w:275,h:105,trees:[.25,.76],flowers:true},
+      {x:615,y:235,w:275,h:155,trees:[.28],flowers:true}
+    ]},
+    {par:4,start:{x:805,y:132},cup:{x:120,y:430},platforms:[
+      {x:650,y:145,w:270,h:105,trees:[.68],flowers:true},
+      {x:360,y:285,w:245,h:115,trees:[.35],flowers:true},
+      {x:35,y:445,w:280,h:95,trees:[.78],flowers:true}
+    ]},
+    {par:5,start:{x:90,y:465},cup:{x:820,y:175},platforms:[
+      {x:25,y:477,w:215,h:63,flowers:true},
+      {x:260,y:380,w:360,h:160,trees:[.22,.70],flowers:true},
+      {x:680,y:190,w:245,h:220,trees:[.32],flowers:true}
+    ]},
+    {par:4,start:{x:820,y:155},cup:{x:125,y:390},platforms:[
+      {x:685,y:168,w:245,h:145,trees:[.28],flowers:true},
+      {x:430,y:260,w:190,h:95,flowers:true},
+      {x:230,y:340,w:155,h:85,trees:[.55]},
+      {x:35,y:405,w:175,h:135,flowers:true}
+    ]},
+    {par:5,start:{x:100,y:470},cup:{x:840,y:115},platforms:[
+      {x:25,y:482,w:215,h:58,trees:[.30],flowers:true},
+      {x:270,y:405,w:170,h:95,flowers:true},
+      {x:470,y:315,w:165,h:120,trees:[.68]},
+      {x:665,y:225,w:115,h:100,flowers:true},
+      {x:760,y:130,w:170,h:165,trees:[.26],flowers:true}
+    ]},
+    {par:5,start:{x:835,y:120},cup:{x:115,y:452},platforms:[
+      {x:750,y:135,w:180,h:150,trees:[.62],flowers:true},
+      {x:565,y:220,w:140,h:90,flowers:true},
+      {x:385,y:300,w:145,h:100,trees:[.32]},
+      {x:210,y:380,w:135,h:90,flowers:true},
+      {x:25,y:467,w:220,h:73,trees:[.75],flowers:true}
+    ]},
+    {par:4,start:{x:95,y:440},cup:{x:845,y:440},platforms:[
+      {x:25,y:452,w:235,h:88,trees:[.25],flowers:true},
+      {x:305,y:425,w:185,h:115,flowers:true},
+      {x:520,y:350,w:135,h:100,trees:[.5]},
+      {x:690,y:452,w:240,h:88,trees:[.75],flowers:true}
+    ]},
+    {par:5,start:{x:825,y:455},cup:{x:125,y:205},platforms:[
+      {x:700,y:468,w:230,h:72,trees:[.72],flowers:true},
+      {x:535,y:375,w:130,h:105,flowers:true},
+      {x:365,y:300,w:125,h:105,trees:[.5]},
+      {x:205,y:240,w:115,h:95,flowers:true},
+      {x:35,y:220,w:150,h:150,trees:[.25],flowers:true}
+    ]},
+    {par:5,start:{x:100,y:455},cup:{x:835,y:145},platforms:[
+      {x:25,y:468,w:230,h:72,trees:[.30],flowers:true},
+      {x:280,y:390,w:140,h:100,flowers:true},
+      {x:445,y:300,w:150,h:125,trees:[.65],flowers:true},
+      {x:620,y:390,w:105,h:90,flowers:true},
+      {x:735,y:160,w:195,h:220,trees:[.22,.72],flowers:true}
+    ]}
+  ];
+
+  let holeIndex=0,strokes=0,totalScore=0,results=[],playing=false,paused=false;
+  let ball={x:0,y:0,vx:0,vy:0,moving:false,grounded:false,lost:false,sinking:false,sinkStart:0,sinkSurfaceY:0};
+  let angle=-Math.PI/4,power=20,charging=false,chargeStart=0,chargeRAF=null;
+  let lastTime=performance.now(),restTimer=0,lastSafe={x:0,y:0};
+
+  const currentHole=()=>holes[holeIndex];
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const speed=()=>Math.hypot(ball.vx,ball.vy);
+  const scoreText=n=>n===0?'E':n>0?'+'+n:String(n);
+  function showMessage(t,ms=1000){message.textContent=t;message.classList.add('show');clearTimeout(showMessage.t);showMessage.t=setTimeout(()=>message.classList.remove('show'),ms)}
+
+  function loadHole(idx,resetStrokes=true){
+    holeIndex=idx; if(resetStrokes)strokes=0;
+    const h=currentHole();
+    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.lost=false;ball.sinking=false;
+    lastSafe={x:ball.x,y:ball.y};restTimer=0;
+    const dx=h.cup.x-ball.x,dy=(h.cup.y-16)-ball.y;angle=Math.atan2(dy,dx);
+    power=20;updatePower();updateHud();
+  }
+
+  function updateHud(){
+    const h=currentHole();
+    holeHud.textContent=`Hole ${holeIndex+1}/9`;
+    parHud.textContent=`Par ${h.par}`;
+    strokeHud.textContent=`Strokes ${strokes}`;
+    scoreHud.textContent=`Score ${scoreText(totalScore)}`;
+    dirHud.textContent=h.cup.y<ball.y?'Goal ↑':h.cup.y>ball.y?'Goal ↓':'Goal →';
+  }
+
+  function updatePower(){powerFill.style.width=power+'%';powerText.textContent=`Power ${Math.round(power)}%`}
+
+  function drawBackground(){
+    const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#8ee6eb');g.addColorStop(.62,'#c9f4f2');g.addColorStop(1,'#e5f4e3');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(255,255,255,.86)';
+    for(const c of [[120,88,1.15],[485,70,.85],[790,105,1.05]]){ctx.beginPath();ctx.arc(c[0],c[1],28*c[2],0,Math.PI*2);ctx.arc(c[0]+31*c[2],c[1]+5,24*c[2],0,Math.PI*2);ctx.arc(c[0]-28*c[2],c[1]+9,20*c[2],0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle='#a8c6c8';ctx.beginPath();ctx.moveTo(0,390);ctx.lineTo(135,300);ctx.lineTo(245,370);ctx.lineTo(390,265);ctx.lineTo(535,380);ctx.lineTo(690,275);ctx.lineTo(835,370);ctx.lineTo(960,305);ctx.lineTo(960,540);ctx.lineTo(0,540);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#91b2b3';ctx.beginPath();ctx.moveTo(0,430);ctx.lineTo(145,345);ctx.lineTo(285,425);ctx.lineTo(460,340);ctx.lineTo(620,438);ctx.lineTo(805,350);ctx.lineTo(960,420);ctx.lineTo(960,540);ctx.lineTo(0,540);ctx.closePath();ctx.fill();
+  }
+
+  function roundedRectPath(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+  }
+
+  function drawTree(x,y,s=1){
+    ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+    ctx.fillStyle='#70452c';roundedRectPath(-8,-55,16,58,6);ctx.fill();
+    ctx.fillStyle='#4d8f2f';for(const c of [[-20,-62,23],[4,-76,27],[25,-60,21],[-4,-50,25]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle='#73b83a';for(const c of [[-23,-70,13],[7,-86,14],[28,-69,11],[-3,-58,12]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}
+    ctx.restore();
+  }
+
+  function drawFlower(x,y,phase=0){
+    ctx.strokeStyle='#39763b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-10);ctx.stroke();
+    ctx.fillStyle=phase%2?'#ffd85a':'#a774df';for(let a=0;a<5;a++){ctx.beginPath();ctx.arc(x+Math.cos(a*1.256)*4,y-12+Math.sin(a*1.256)*4,2.7,0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle='#f7b94b';ctx.beginPath();ctx.arc(x,y-12,2.4,0,Math.PI*2);ctx.fill();
+  }
+
+  function drawPlatform(p){
+    const r=Math.min(20,p.w*.08,p.h*.16);
+    ctx.fillStyle='#a85b32';roundedRectPath(p.x,p.y,p.w,p.h,r);ctx.fill();
+    const soil=ctx.createLinearGradient(p.x,p.y,p.x+p.w,p.y+p.h);soil.addColorStop(0,'rgba(190,105,55,.45)');soil.addColorStop(1,'rgba(100,49,31,.20)');ctx.fillStyle=soil;roundedRectPath(p.x+4,p.y+8,p.w-8,Math.max(16,p.h-12),Math.max(6,r-4));ctx.fill();
+
+    // dirt texture and cracks - deterministic so it does not shimmer frame to frame
+    const marks=Math.max(2,Math.floor(p.w/70));
+    for(let i=0;i<marks;i++){
+      const mx=p.x+22+((i*67+p.x*0.17)%Math.max(28,p.w-44));
+      const my=p.y+30+((i*43+p.y*0.11)%Math.max(20,p.h-48));
+      ctx.strokeStyle='rgba(92,49,31,.45)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx+7,my+5);ctx.lineTo(mx+3,my+13);ctx.stroke();
+    }
+
+    // thick grassy cap and dangling tufts
+    ctx.fillStyle='#3d8f2f';roundedRectPath(p.x-3,p.y-5,p.w+6,18,9);ctx.fill();
+    ctx.fillStyle='#68b63f';roundedRectPath(p.x,p.y-7,p.w,10,6);ctx.fill();
+    ctx.fillStyle='#2f7b2a';
+    for(let gx=p.x+5;gx<p.x+p.w-4;gx+=18){
+      const drop=5+(((gx+p.y)|0)%9);ctx.beginPath();ctx.moveTo(gx,p.y+7);ctx.lineTo(gx+5,p.y+7+drop);ctx.lineTo(gx+10,p.y+7);ctx.closePath();ctx.fill();
+    }
+
+    if(p.trees){for(const f of p.trees)drawTree(p.x+p.w*f,p.y-5, p.w>220?.9:.72)}
+    if(p.flowers){
+      const count=Math.max(2,Math.min(6,Math.floor(p.w/55)));
+      for(let i=0;i<count;i++)drawFlower(p.x+18+i*(p.w-36)/Math.max(1,count-1),p.y-3,i+Math.floor(p.x));
+    }
+  }
+
+  function cupSurfaceY(h=currentHole()){
+    const candidates=h.platforms.filter(p=>h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
+    if(!candidates.length)return h.cup.y;
+    let best=candidates[0],bestDist=Math.abs(best.y-h.cup.y);
+    for(const p of candidates){const d=Math.abs(p.y-h.cup.y);if(d<bestDist){best=p;bestDist=d;}}
+    return best.y;
+  }
+
+  function drawCup(){
+    const h=currentHole(),x=h.cup.x,y=cupSurfaceY(h);
+    // The cup is cut into the grass surface, not floating above it.
+    ctx.save();
+    ctx.fillStyle='#151515';ctx.beginPath();ctx.ellipse(x,y-1,15,5,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#f6f2df';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y-2);ctx.lineTo(x,y-70);ctx.stroke();
+    ctx.fillStyle='#e84d4d';ctx.beginPath();ctx.moveTo(x,y-70);ctx.lineTo(x+35,y-58);ctx.lineTo(x,y-47);ctx.closePath();ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBall(){
+    if(ball.lost)return;
+    let drawY=ball.y,r=BALL_R,alpha=1;
+    if(ball.sinking){
+      const t=clamp((performance.now()-ball.sinkStart)/430,0,1);
+      drawY=ball.y+t*15;
+      r=BALL_R*(1-t*.92);
+      alpha=1-t*.8;
+    }
+    ctx.save();ctx.globalAlpha=alpha;
+    ctx.fillStyle='#fff';ctx.strokeStyle='#c7d0cc';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ball.x,drawY,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,.15)';for(const a of [0,.9,1.8,2.7,3.6,4.5,5.4]){ctx.beginPath();ctx.arc(ball.x+Math.cos(a)*r*.5,drawY+Math.sin(a)*r*.5,Math.max(.6,r*.13),0,Math.PI*2);ctx.fill()}
+    ctx.restore();
+  }
+
+  function drawAim(){
+    if(ball.moving||ball.sinking||ball.lost||!playing||paused)return;
+    const len=70+power*.65,ex=ball.x+Math.cos(angle)*len,ey=ball.y+Math.sin(angle)*len;
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=4;ctx.setLineDash([9,8]);ctx.beginPath();ctx.moveTo(ball.x,ball.y);ctx.lineTo(ex,ey);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-Math.cos(angle-.55)*15,ey-Math.sin(angle-.55)*15);ctx.lineTo(ex-Math.cos(angle+.55)*15,ey-Math.sin(angle+.55)*15);ctx.closePath();ctx.fill();ctx.restore();
+  }
+
+  function draw(){
+    drawBackground();
+    ctx.strokeStyle='#e8dab0';ctx.lineWidth=10;ctx.strokeRect(5,5,W-10,H-10);
+    for(const p of currentHole().platforms)drawPlatform(p);
+    drawCup();drawAim();drawBall();
+  }
+
+  function circleRectCollision(p){
+    const nx=clamp(ball.x,p.x,p.x+p.w),ny=clamp(ball.y,p.y,p.y+p.h),dx=ball.x-nx,dy=ball.y-ny;
+    return dx*dx+dy*dy<BALL_R*BALL_R?{nx,ny,dx,dy}:null;
+  }
+
+  function resolvePlatform(p,prevX,prevY){
+    const hit=circleRectCollision(p);if(!hit)return false;
+    const wasAbove=prevY+BALL_R<=p.y+2,wasBelow=prevY-BALL_R>=p.y+p.h-2,wasLeft=prevX+BALL_R<=p.x+2,wasRight=prevX-BALL_R>=p.x+p.w-2;
+    if(wasAbove){
+      const impact=Math.abs(ball.vy);
+      ball.y=p.y-BALL_R;
+      // Soft turf: hard landings give one small deadened bounce; gentle landings simply roll.
+      if(impact>300)ball.vy=-impact*.20;
+      else if(impact>185)ball.vy=-impact*.11;
+      else ball.vy=0;
+      ball.vx*=impact>240?.91:.96;
+      ball.grounded=ball.vy===0;
+    }
+    else if(wasBelow){ball.y=p.y+p.h+BALL_R;ball.vy=Math.abs(ball.vy)*.38;ball.vx*=.96;}
+    else if(wasLeft){ball.x=p.x-BALL_R;ball.vx=-Math.abs(ball.vx)*.56;ball.vy*=.97;}
+    else if(wasRight){ball.x=p.x+p.w+BALL_R;ball.vx=Math.abs(ball.vx)*.56;ball.vy*=.97;}
+    else{
+      const penX=Math.min(Math.abs(ball.x-(p.x-BALL_R)),Math.abs(ball.x-(p.x+p.w+BALL_R)));
+      const penY=Math.min(Math.abs(ball.y-(p.y-BALL_R)),Math.abs(ball.y-(p.y+p.h+BALL_R)));
+      if(penY<penX){
+        if(ball.y<p.y){
+          const impact=Math.abs(ball.vy);ball.y=p.y-BALL_R;
+          ball.vy=impact>260?-impact*.16:0;ball.vx*=.95;ball.grounded=ball.vy===0;
+        }else{ball.y=p.y+p.h+BALL_R;ball.vy=Math.abs(ball.vy)*.36;}
+      }else{
+        if(ball.x<p.x){ball.x=p.x-BALL_R;ball.vx=-Math.abs(ball.vx)*.56}
+        else{ball.x=p.x+p.w+BALL_R;ball.vx=Math.abs(ball.vx)*.56}
+      }
+    }
+    return true;
+  }
+
+  function checkCup(){
+    if(ball.sinking||ball.lost)return false;
+    const h=currentHole(),surfaceY=cupSurfaceY(h);
+    const closeX=Math.abs(ball.x-h.cup.x)<15;
+    const onSurface=ball.y+BALL_R>=surfaceY-3&&ball.y<=surfaceY+5;
+    if(closeX&&onSurface&&speed()<165){
+      ball.x=h.cup.x;ball.y=surfaceY-BALL_R;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=false;
+      ball.sinking=true;ball.sinkStart=performance.now();ball.sinkSurfaceY=surfaceY;
+      showMessage('In the hole!',700);
+      setTimeout(()=>{if(playing&&ball.sinking){ball.sinking=false;completeHole();}},440);
+      return true;
+    }
+    return false;
+  }
+
+  function loseBall(){
+    if(ball.lost||ball.sinking)return;
+    ball.lost=true;ball.moving=true;ball.vx=ball.vy=0;
+    showMessage('Ball lost — stroke counts',900);
+    setTimeout(()=>{
+      if(!playing)return;
+      ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.lost=false;restTimer=0;
+      showMessage('Play again from the last spot',750);updateHud();
+    },650);
+  }
+
+  function physics(dt){
+    if(!playing||paused||!ball.moving||ball.sinking||ball.lost)return;
+    const prevX=ball.x,prevY=ball.y;
+    ball.grounded=false;
+    ball.vy+=GRAVITY*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+    ball.vx*=Math.pow(.998,dt*60);
+
+    // Side and ceiling walls remain usable for deliberate bank shots.
+    if(ball.x<BALL_R+8){ball.x=BALL_R+8;ball.vx=Math.abs(ball.vx)*.66}
+    if(ball.x>W-BALL_R-8){ball.x=W-BALL_R-8;ball.vx=-Math.abs(ball.vx)*.66}
+    if(ball.y<BALL_R+8){ball.y=BALL_R+8;ball.vy=Math.abs(ball.vy)*.62}
+
+    // Falling below the islands is out of bounds: no bottom-wall rebound.
+    if(ball.y>H+BALL_R+18){loseBall();return;}
+
+    for(const p of currentHole().platforms)resolvePlatform(p,prevX,prevY);
+    if(checkCup())return;
+
+    // Rolling resistance on grass, separate from impact damping.
+    if(ball.grounded&&ball.vy===0){
+      ball.vx*=Math.pow(.986,dt*60);
+      if(Math.abs(ball.vx)<9)ball.vx=0;
+    }
+
+    const sp=speed();
+    if(sp<11&&ball.grounded){
+      restTimer+=dt;
+      if(restTimer>.28){ball.vx=ball.vy=0;ball.moving=false;lastSafe={x:ball.x,y:ball.y};showMessage('Ready for next shot',650);updateHud();}
+    }else restTimer=0;
+  }
+
+  function hitBall(){
+    if(!playing||paused||ball.moving)return;
+    strokes++;const sp=300+power*5.6;ball.vx=Math.cos(angle)*sp;ball.vy=Math.sin(angle)*sp;ball.moving=true;ball.grounded=false;ball.lost=false;ball.sinking=false;restTimer=0;updateHud();
+  }
+
+  function completeHole(){
+    const h=currentHole(),diff=strokes-h.par;totalScore+=diff;results.push({hole:holeIndex+1,par:h.par,strokes,diff});
+    showMessage(diff<=-2?'Eagle!':diff===-1?'Birdie!':diff===0?'Par!':diff===1?'Bogey!':'Hole complete!',1200);
+    setTimeout(()=>{
+      if(holeIndex>=holes.length-1)finishRound();else{holeIndex++;loadHole(holeIndex,true)}
+    },900);
+  }
+
+  function finishRound(){
+    playing=false;endSummary.textContent=`You finished ${scoreText(totalScore)} for the 9-hole round.`;scoreGrid.innerHTML='';
+    for(const r of results){const d=document.createElement('div');d.className='scorecell';d.innerHTML=`Hole ${r.hole}<strong>${r.strokes}</strong>Par ${r.par}`;scoreGrid.appendChild(d)}
+    startCard.style.display='none';pauseCard.style.display='none';endCard.style.display='block';overlay.classList.remove('hidden');
+  }
+
+  function startGame(){
+    results=[];totalScore=0;holeIndex=0;playing=true;paused=false;startCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.add('hidden');loadHole(0,true);
+  }
+
+  function toTitle(){playing=false;paused=false;startCard.style.display='block';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
+
+  function resetBall(){if(!playing||paused||ball.moving||ball.sinking||ball.lost)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.grounded=true;showMessage('Ball reset',600)}
+  function adjustAngle(delta){if(!playing||paused||ball.moving||ball.sinking||ball.lost)return;angle+=delta;angle=clamp(angle,-Math.PI+.08,Math.PI-.08)}
+
+  function beginCharge(e){if(!playing||paused||ball.moving||ball.sinking||ball.lost)return;e.preventDefault();charging=true;chargeStart=performance.now();hitBtn.setPointerCapture?.(e.pointerId);chargeLoop()}
+  function chargeLoop(){if(!charging)return;const t=(performance.now()-chargeStart)/1000;power=20+80*((Math.sin(t*2.7-Math.PI/2)+1)/2);updatePower();chargeRAF=requestAnimationFrame(chargeLoop)}
+  function releaseCharge(e){if(!charging)return;e?.preventDefault();charging=false;if(chargeRAF)cancelAnimationFrame(chargeRAF);hitBall()}
+
+  let aimHold=null;
+  function startAim(dir,e){e.preventDefault();adjustAngle(dir*.07);clearInterval(aimHold);aimHold=setInterval(()=>adjustAngle(dir*.045),55)}
+  function stopAim(){clearInterval(aimHold);aimHold=null}
+
+  leftBtn.addEventListener('pointerdown',e=>startAim(-1,e));rightBtn.addEventListener('pointerdown',e=>startAim(1,e));
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>{leftBtn.addEventListener(ev,stopAim);rightBtn.addEventListener(ev,stopAim)});
+  hitBtn.addEventListener('pointerdown',beginCharge);hitBtn.addEventListener('pointerup',releaseCharge);hitBtn.addEventListener('pointercancel',()=>{charging=false;if(chargeRAF)cancelAnimationFrame(chargeRAF)});
+  resetBtn.addEventListener('click',resetBall);
+  pauseBtn.addEventListener('click',()=>{if(!playing)return;paused=true;startCard.style.display='none';endCard.style.display='none';pauseCard.style.display='block';overlay.classList.remove('hidden')});
+  continueBtn.addEventListener('click',()=>{paused=false;pauseCard.style.display='none';overlay.classList.add('hidden')});
+  restartHoleBtn.addEventListener('click',()=>{paused=false;pauseCard.style.display='none';overlay.classList.add('hidden');loadHole(holeIndex,true)});
+  titleBtn.addEventListener('click',toTitle);startBtn.addEventListener('click',startGame);againBtn.addEventListener('click',startGame);
+
+  canvas.addEventListener('pointerdown',e=>{
+    if(!playing||paused||ball.moving||ball.sinking||ball.lost)return;
+    const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+    angle=Math.atan2(y-ball.y,x-ball.x);
+  });
+
+  function frame(t){const dt=Math.min(.025,(t-lastTime)/1000);lastTime=t;physics(dt);draw();requestAnimationFrame(frame)}
+  loadHole(0,true);draw();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
