@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Bounce Golf · Long Islands</title>
-<meta name="bounce-golf-version" content="2026-09-22-long-islands-v1">
+<title>Bounce Golf · Cartoon Islands</title>
+<meta name="bounce-golf-version" content="2026-09-22-cartoon-islands-v1">
 <style>
   :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -73,6 +73,30 @@
     #controls{grid-template-columns:1fr 1.2fr;margin-top:4px;gap:5px}button{min-height:46px;font-size:14px}#hitBtn{font-size:17px}
     #secondaryControls{display:none}#powerWrap{padding:5px}#tip{display:none}
   }
+
+  /* Cartoon platform-game presentation, matched to the reference level art. */
+  :root{--ink:#243a36;--cream:#fff9e9;--green:#398d43;--gold:#f4c54c;--sky:#8bd5ff}
+  html,body{background:#203c3b}
+  #gameShell{max-width:1180px}
+  #hud{gap:5px;margin-bottom:5px}
+  .hudBox{background:#253944;color:#fff;border:2px solid #d2eaf3;border-radius:13px;box-shadow:0 3px 0 #10242d;padding:9px 5px;letter-spacing:.01em}
+  #stage{background:#80cffa;border:3px solid #d9f0ff;border-radius:16px;box-shadow:0 10px 0 #132e34,0 18px 34px #091d2380}
+  canvas{background:#80cffa}
+  #controls{background:#263a40;border:2px solid #77969b;border-radius:17px;padding:9px;gap:8px;margin-top:11px;box-shadow:0 4px 0 #14292e}
+  #aimControls{gap:8px}
+  #controls button{border:2px solid #b9d4cc;background:#3c7563;box-shadow:0 3px 0 #183d34}
+  #controls #hitBtn{background:#ffca4c;color:#283b30;border-color:#fff1b7;box-shadow:0 3px 0 #ac7826}
+  #controls #secondaryControls button{background:#344d56;box-shadow:0 2px 0 #152b31}
+  #powerWrap{background:#e5f5e9}
+  #message{border:2px solid #effcf6;background:#223d43;color:#fff;box-shadow:0 3px 0 #0f2930}
+  .card{border:3px solid #ecf7d9}
+  #tip{color:#e7f6ee;font-weight:600;line-height:1.5}
+  @media(max-width:700px){
+    #hud{gap:3px;margin:0 3px 4px}
+    .hudBox{font-size:10px;padding:6px 2px;border-width:1px;border-radius:8px}
+    #stage{border-width:2px;border-radius:9px}
+    #controls{margin:6px 2px 0;padding:6px;border-radius:12px;gap:6px}
+  }
 </style>
 </head>
 <body>
@@ -93,7 +117,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
-        <p>Side-view platform golf. Every round creates long islands, occasional connected steps, fresh themes and random ball types. Snow slides, sand slows you down, jungle turf grips, and volcanic rock gives harder rebounds.</p>
+        <p>Nine colourful cartoon courses inspired by classic platform games: grassy rock islands, stepped paths, bridges, ladders, trees and wooden crates. Every hole has a new layout, theme and ball type.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
           <button class="diffBtn" data-difficulty="easy">Easy</button>
@@ -201,7 +225,7 @@
 
 
   const themes={
-    classic:{label:'Classic',skyTop:'#8ee6eb',skyBottom:'#e5f4e3',cloud:'rgba(255,255,255,.86)',mountain1:'#a8c6c8',mountain2:'#91b2b3',soil1:'#a85b32',soil2:'rgba(190,105,55,.45)',soilShade:'rgba(100,49,31,.20)',crack:'rgba(92,49,31,.45)',grass1:'#3d8f2f',grass2:'#68b63f',tuft:'#2f7b2a',trunk:'#70452c',leaf1:'#4d8f2f',leaf2:'#73b83a',stem:'#39763b',petal1:'#ffd85a',petal2:'#a774df',center:'#f7b94b',hazardKind:'water',hazardDepth:60,hazard1:'#2f84db',hazard2:'#60c9f7',hazardFoam:'rgba(255,255,255,.8)',lossText:'Splash! Ball lost — stroke counts',effectColor:'#bdefff',surface:'Normal grass',groundBounce:1,landingGrip:1,rollDecay:1,puttSpeed:1,wallBounce:1,cupCatch:1},
+    classic:{label:'Classic',skyTop:'#6fc8ff',skyBottom:'#c8f0ff',cloud:'rgba(255,255,255,.86)',mountain1:'#6cb5c4',mountain2:'#399d9d',soil1:'#b8864e',soil2:'rgba(190,105,55,.45)',soilShade:'rgba(100,49,31,.20)',crack:'rgba(92,49,31,.45)',grass1:'#238b35',grass2:'#84d832',tuft:'#2f7b2a',trunk:'#70452c',leaf1:'#4d8f2f',leaf2:'#73b83a',stem:'#39763b',petal1:'#ffd85a',petal2:'#a774df',center:'#f7b94b',hazardKind:'water',hazardDepth:60,hazard1:'#2f84db',hazard2:'#60c9f7',hazardFoam:'rgba(255,255,255,.8)',lossText:'Splash! Ball lost — stroke counts',effectColor:'#bdefff',surface:'Normal grass',groundBounce:1,landingGrip:1,rollDecay:1,puttSpeed:1,wallBounce:1,cupCatch:1},
     snowy:{label:'Snowy',skyTop:'#b8dbff',skyBottom:'#eef7ff',cloud:'rgba(255,255,255,.8)',mountain1:'#d6e5ef',mountain2:'#b6c9d6',soil1:'#7f8c97',soil2:'rgba(195,210,220,.35)',soilShade:'rgba(85,104,121,.22)',crack:'rgba(96,108,121,.28)',grass1:'#eef4f8',grass2:'#ffffff',tuft:'#dce9f2',trunk:'#6a5b50',leaf1:'#52734f',leaf2:'#86a98d',stem:'#7ca19f',petal1:'#d7f2ff',petal2:'#ffffff',center:'#f2cc73',hazardKind:'icewater',hazardDepth:62,hazard1:'#4eb7f1',hazard2:'#baf0ff',hazardFoam:'rgba(255,255,255,.9)',lossText:'Splosh! Lost in icy water — stroke counts',effectColor:'#e6fbff',surface:'Slippery snow',groundBounce:.92,landingGrip:.99,rollDecay:1.008,puttSpeed:1.08,wallBounce:1.04,cupCatch:1.08},
     desert:{label:'Desert',skyTop:'#ffd194',skyBottom:'#ffe9be',cloud:'rgba(255,244,210,.6)',mountain1:'#d9a06b',mountain2:'#b97645',soil1:'#b8763d',soil2:'rgba(255,204,130,.22)',soilShade:'rgba(112,67,29,.18)',crack:'rgba(120,70,32,.35)',grass1:'#ddb45d',grass2:'#f1d387',tuft:'#b79037',trunk:'#8f6431',leaf1:'#73a24c',leaf2:'#9dcc68',stem:'#8a7a2f',petal1:'#ffdd79',petal2:'#ff9d57',center:'#fff2b5',hazardKind:'sand',hazardDepth:58,hazard1:'#d6b04f',hazard2:'#f0d57c',hazardFoam:'rgba(255,243,205,.6)',lossText:'Buried in sand — stroke counts',effectColor:'#f5e4ae',surface:'Soft sand',groundBounce:.48,landingGrip:.70,rollDecay:.965,puttSpeed:.76,wallBounce:.88,cupCatch:1.10},
     jungle:{label:'Jungle',skyTop:'#6ad0c8',skyBottom:'#d9f6db',cloud:'rgba(255,255,255,.65)',mountain1:'#6eb39a',mountain2:'#3e7a63',soil1:'#755233',soil2:'rgba(117,82,51,.38)',soilShade:'rgba(54,33,18,.22)',crack:'rgba(64,40,20,.38)',grass1:'#2b994c',grass2:'#59d062',tuft:'#1e7d35',trunk:'#5f3b1f',leaf1:'#1f8740',leaf2:'#57b760',stem:'#2d8d41',petal1:'#ffdb57',petal2:'#ff5f9d',center:'#fff3a0',hazardKind:'swamp',hazardDepth:60,hazard1:'#355f2a',hazard2:'#68a646',hazardFoam:'rgba(201,232,128,.45)',lossText:'Plop! Swallowed by the swamp — stroke counts',effectColor:'#c5ef7f',surface:'Grippy jungle turf',groundBounce:.68,landingGrip:.84,rollDecay:.982,puttSpeed:.88,wallBounce:.92,cupCatch:1.06},
@@ -359,7 +383,7 @@
     }
 
     const path=Array.from({length:count},(_,i)=>({
-      x:xs[i],y:ys[i],w:widths[i],h:rand(cfg.height[0],cfg.height[1]),
+      x:xs[i],y:ys[i],w:widths[i],h:Math.min(rand(cfg.height[0],cfg.height[1]),Math.max(28,H-hazardDepth-12-ys[i])),
       flowers:Math.random()<.65,joinedToNext:i<count-1&&gaps[i]===0,
       isGreen:i===count-1,isApron:i===count-2&&gaps[i]===0,
       approachDir:dir
@@ -371,6 +395,30 @@
     path[count-1].flowers=false;
     if(path[count-2].isApron){path[count-2].flowers=false;delete path[count-2].trees;}
 
+    // Extra elevated islands create the stacked silhouette of a platform game.
+    // They are real collidable platforms, not painted background scenery.
+    const extras=[];
+    if(count>=3&&Math.random()<.78){
+      const baseIndex=randInt(1,count-2),base=path[baseIndex];
+      const extraY=base.y-rand(125,175);
+      if(extraY>88){
+        const w=Math.min(rand(115,180),base.w+55);
+        const x=clamp(base.x+base.w*.5-w*.5+rand(-40,40),margin,W-margin-w);
+        extras.push({x,y:extraY,w,h:rand(34,49),isBonus:true,
+          flowers:false,scenery:'bush',ladderTo:baseIndex});
+      }
+    }
+    // Optional solid crates: no crate is placed on the tee, the approach or
+    // the green, so none can trap the ball or block the final putt.
+    const crates=[];
+    for(let i=1;i<count-1;i++){
+      const p=path[i];
+      if(!p.isApron&&p.w>145&&Math.random()<.32){
+        const size=rand(27,37);
+        crates.push({x:p.x+p.w*.58-size*.5,y:p.y-size,w:size,h:size,
+          isCrate:true,flowers:false});
+      }
+    }
     const startPlatform=path[0],green=path[count-1];
     const startX=startPlatform.x+startPlatform.w*(dir===1?.24:.76);
     // Cup is well inside the green, not perched at its far edge. Its landing
@@ -379,7 +427,8 @@
     const par=Math.max(3,count+(difficulty==='easy'?0:1));
     return {
       par,theme:themeKey,backdrop:randomBackdrop(themeKey),layout:layoutType,ballType:randomBallKey(),
-      start:{x:startX,y:startPlatform.y},cup:{x:cupX,y:green.y},platforms:path
+      start:{x:startX,y:startPlatform.y},cup:{x:cupX,y:green.y},
+      mainPlatforms:path,platforms:[...path,...extras,...crates]
     };
   }
 
@@ -476,6 +525,24 @@
       ctx.fillStyle='#51484c';ctx.fillRect(0,H*.67,W,H*.33);ctx.fillStyle='rgba(255,115,60,.25)';for(let x=0;x<W;x+=110)ctx.fillRect(x,H*.69+((x*9)%90),70,4);
     }
 
+    // A calm lake and forest silhouettes give the Classic world the same
+    // colourful depth as the reference without painting any fake platforms.
+    if(th.label==='Classic'&&['hills','mountains','forest','coast','lake'].includes(style)){
+      ctx.save();ctx.fillStyle='rgba(38,158,184,.22)';
+      ctx.beginPath();ctx.moveTo(0,H*.78);ctx.bezierCurveTo(W*.27,H*.74,W*.37,H*.85,W*.57,H*.79);
+      ctx.bezierCurveTo(W*.78,H*.74,W*.90,H*.83,W,H*.78);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+      ctx.fillStyle='rgba(28,137,115,.28)';
+      for(let i=0;i<55;i++){
+        const tx=i*21-10,ty=H*.77+Math.sin(i*2.7)*19;
+        ctx.beginPath();ctx.arc(tx,ty,13+(i%3)*4,0,Math.PI*2);ctx.fill();
+      }
+      ctx.strokeStyle='rgba(222,255,247,.45)';ctx.lineWidth=2;
+      for(let i=0;i<16;i++){
+        const lx=20+i*67,ly=H*.87+(i%4)*8;
+        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+29,ly);ctx.stroke();
+      }
+      ctx.restore();
+    }
     drawHazard(th);
   }
 
@@ -513,64 +580,137 @@
     r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
   }
 
-  function drawTree(x,y,s=1){
-    const th=currentTheme();
-    ctx.save();ctx.translate(x,y);ctx.scale(s,s);
-    ctx.fillStyle=th.trunk;roundedRectPath(-8,-55,16,58,6);ctx.fill();
-    ctx.fillStyle=th.leaf1;for(const c of [[-20,-62,23],[4,-76,27],[25,-60,21],[-4,-50,25]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}
-    ctx.fillStyle=th.leaf2;for(const c of [[-23,-70,13],[7,-86,14],[28,-69,11],[-3,-58,12]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}
-    if(th.label==='Snowy'){ctx.fillStyle='rgba(255,255,255,.9)';for(const c of [[-15,-66,10],[9,-78,10],[21,-60,8],[-4,-52,9]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}}
+  function inkStroke(color='#3e563b',width=2){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineJoin='round';ctx.lineCap='round';}
+  function drawBush(x,y,s=1){
+    const th=currentTheme();ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+    const dark=th.label==='Snowy'?'#577c7c':th.label==='Desert'?'#758d45':th.label==='Autumn'?'#9e542e':'#166d39';
+    const light=th.label==='Snowy'?'#b4e1d9':th.label==='Desert'?'#a3b25a':th.label==='Autumn'?'#f1aa40':'#58c844';
+    inkStroke(dark,3);ctx.fillStyle=dark;ctx.beginPath();
+    ctx.moveTo(-36,0);ctx.quadraticCurveTo(-42,-17,-28,-22);ctx.quadraticCurveTo(-27,-37,-12,-30);
+    ctx.quadraticCurveTo(0,-46,13,-31);ctx.quadraticCurveTo(32,-39,36,-20);
+    ctx.quadraticCurveTo(46,-12,37,0);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle=light;for(const [bx,by,br] of [[-21,-15,14],[-3,-23,17],[20,-15,14]]){
+      ctx.beginPath();ctx.arc(bx,by,br,Math.PI,0);ctx.lineTo(bx+br,0);ctx.lineTo(bx-br,0);ctx.closePath();ctx.fill();
+    }
+    ctx.strokeStyle=dark;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-30,-9);ctx.quadraticCurveTo(-17,-15,-10,-9);ctx.moveTo(2,-23);ctx.quadraticCurveTo(10,-29,17,-22);ctx.stroke();
     ctx.restore();
   }
-
-  function drawFlower(x,y,phase=0){
-    const th=currentTheme();
-    ctx.strokeStyle=th.stem;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-10);ctx.stroke();
-    ctx.fillStyle=phase%2?th.petal1:th.petal2;for(let a=0;a<5;a++){ctx.beginPath();ctx.arc(x+Math.cos(a*1.256)*4,y-12+Math.sin(a*1.256)*4,2.7,0,Math.PI*2);ctx.fill()}
-    ctx.fillStyle=th.center;ctx.beginPath();ctx.arc(x,y-12,2.4,0,Math.PI*2);ctx.fill();
-  }
-
-  function drawPlatform(p){
-    const th=currentTheme();
-    const r=Math.min(20,p.w*.08,p.h*.16);
-    ctx.fillStyle=th.soil1;roundedRectPath(p.x,p.y,p.w,p.h,r);ctx.fill();
-    const soil=ctx.createLinearGradient(p.x,p.y,p.x+p.w,p.y+p.h);soil.addColorStop(0,th.soil2);soil.addColorStop(1,th.soilShade);ctx.fillStyle=soil;roundedRectPath(p.x+4,p.y+8,p.w-8,Math.max(16,p.h-12),Math.max(6,r-4));ctx.fill();
-
-    const marks=Math.max(2,Math.floor(p.w/70));
-    for(let i=0;i<marks;i++){
-      const mx=p.x+22+((i*67+p.x*0.17)%Math.max(28,p.w-44));
-      const my=p.y+30+((i*43+p.y*0.11)%Math.max(20,p.h-48));
-      ctx.strokeStyle=th.crack;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx+7,my+5);ctx.lineTo(mx+3,my+13);ctx.stroke();
+  function drawTree(x,y,s=1){
+    const th=currentTheme();ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+    inkStroke('#694b2e',3);ctx.fillStyle=th.trunk;
+    ctx.beginPath();ctx.moveTo(-10,2);ctx.bezierCurveTo(-7,-28,-18,-52,-28,-62);
+    ctx.lineTo(-20,-67);ctx.quadraticCurveTo(-7,-56,-1,-48);
+    ctx.quadraticCurveTo(7,-72,23,-77);ctx.lineTo(27,-70);
+    ctx.quadraticCurveTo(10,-57,10,-42);ctx.lineTo(13,2);ctx.closePath();ctx.fill();ctx.stroke();
+    const dark=th.label==='Snowy'?'#527c72':th.label==='Autumn'?'#b2672e':th.label==='Desert'?'#729c49':'#127e46';
+    const light=th.label==='Snowy'?'#b1dfc8':th.label==='Autumn'?'#e9a33b':th.label==='Desert'?'#b7c967':'#66c943';
+    inkStroke('#255e3d',3);ctx.fillStyle=dark;
+    for(const [cx,cy,r] of [[-29,-77,31],[-5,-91,36],[27,-77,32],[-3,-65,32]]){
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();ctx.stroke();
     }
-
-    const isPuttingGreen=p.isGreen;
-    const isApron=p.isApron;
-    ctx.fillStyle=isPuttingGreen?'#397e48':isApron?'#4b9654':th.grass1;
-    roundedRectPath(p.x-3,p.y-5,p.w+6,18,9);ctx.fill();
-    ctx.fillStyle=isPuttingGreen?'#80ca82':isApron?'#72bb70':th.grass2;
-    roundedRectPath(p.x,p.y-7,p.w,10,6);ctx.fill();
-    if(isPuttingGreen){
-      // Subtle alternating mown stripes and a blended landing apron make the
-      // final island look like a proper green, not a different type of block.
-      ctx.save();ctx.globalAlpha=.18;ctx.fillStyle='#e8ffe1';
-      for(let gx=p.x+18;gx<p.x+p.w-18;gx+=40)ctx.fillRect(gx,p.y-7,18,10);
-      ctx.globalAlpha=.8;ctx.fillStyle='#a3d996';
-      const apronW=Math.min(66,p.w*.24);
-      const apronX=p.approachDir===1?p.x:p.x+p.w-apronW;
-      roundedRectPath(apronX,p.y-7,apronW,10,5);ctx.fill();ctx.restore();
+    ctx.fillStyle=light;
+    for(const [cx,cy,r] of [[-39,-89,16],[-9,-109,20],[19,-95,19],[32,-70,14],[-18,-64,16]]){
+      ctx.beginPath();ctx.arc(cx,cy,r,Math.PI*1.05,Math.PI*1.92);ctx.quadraticCurveTo(cx+5,cy+4,cx-r*.6,cy+4);ctx.closePath();ctx.fill();
     }
-    if(!isPuttingGreen){
-      ctx.fillStyle=isApron?'#387943':th.tuft;
-      for(let gx=p.x+5;gx<p.x+p.w-4;gx+=18){
-        const drop=isApron?3:5+(((gx+p.y)|0)%9);
-        ctx.beginPath();ctx.moveTo(gx,p.y+7);ctx.lineTo(gx+5,p.y+7+drop);ctx.lineTo(gx+10,p.y+7);ctx.closePath();ctx.fill();
+    if(th.label==='Snowy'){
+      ctx.fillStyle='#f5ffff';for(const [cx,cy] of [[-38,-104],[-10,-124],[21,-107]]){
+        ctx.beginPath();ctx.ellipse(cx,cy,17,5,-.2,0,Math.PI*2);ctx.fill();
       }
     }
-
-    if(p.trees){for(const f of p.trees)drawTree(p.x+p.w*f,p.y-5, p.w>220?.9:.72)}
-    if(p.flowers){
-      const count=Math.max(2,Math.min(6,Math.floor(p.w/55)));
-      for(let i=0;i<count;i++)drawFlower(p.x+18+i*(p.w-36)/Math.max(1,count-1),p.y-3,i+Math.floor(p.x));
+    ctx.restore();
+  }
+  function drawFlower(x,y,phase=0){
+    const th=currentTheme();ctx.strokeStyle=th.stem;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-9);ctx.stroke();
+    ctx.fillStyle=phase%2?th.petal1:th.petal2;
+    for(let a=0;a<5;a++){ctx.beginPath();ctx.arc(x+Math.cos(a*1.256)*3,y-11+Math.sin(a*1.256)*3,2.2,0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle=th.center;ctx.beginPath();ctx.arc(x,y-11,2,0,Math.PI*2);ctx.fill();
+  }
+  function drawCrate(p){
+    const x=p.x,y=p.y,w=p.w,h=p.h;ctx.save();
+    ctx.fillStyle='#9b4f22';inkStroke('#4c2c20',2.5);
+    ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h);
+    ctx.fillStyle='#ca7d3b';ctx.fillRect(x+4,y+4,w-8,h-8);
+    ctx.strokeStyle='#68381e';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(x+5,y+5);ctx.lineTo(x+w-5,y+h-5);
+    ctx.moveTo(x+w-5,y+5);ctx.lineTo(x+5,y+h-5);ctx.stroke();
+    ctx.strokeRect(x+5,y+5,w-10,h-10);
+    ctx.fillStyle='#e6a45c';ctx.fillRect(x+5,y+5,w-10,3);
+    ctx.restore();
+  }
+  function drawLadder(x,top,bottom){
+    if(bottom-top<28)return;
+    ctx.save();inkStroke('#523f26',3);ctx.strokeStyle='#634123';
+    ctx.beginPath();ctx.moveTo(x-17,top);ctx.lineTo(x-17,bottom);
+    ctx.moveTo(x+17,top);ctx.lineTo(x+17,bottom);ctx.stroke();
+    ctx.strokeStyle='#e3b364';ctx.lineWidth=6;
+    for(let y=top+10;y<bottom-4;y+=16){ctx.beginPath();ctx.moveTo(x-18,y);ctx.lineTo(x+18,y);ctx.stroke();}
+    ctx.strokeStyle='#694421';ctx.lineWidth=1.6;
+    for(let y=top+10;y<bottom-4;y+=16){ctx.beginPath();ctx.moveTo(x-18,y+2);ctx.lineTo(x+18,y+2);ctx.stroke();}
+    ctx.restore();
+  }
+  function drawDirectionSign(x,y,dir){
+    ctx.save();ctx.translate(x,y);ctx.scale(dir,1);
+    ctx.fillStyle='#875229';inkStroke('#4b3d2a',2.4);
+    ctx.fillRect(-3,-27,6,29);ctx.strokeRect(-3,-27,6,29);
+    ctx.fillStyle='#e9b85e';ctx.beginPath();ctx.moveTo(-25,-31);ctx.lineTo(7,-31);
+    ctx.lineTo(7,-38);ctx.lineTo(29,-23);ctx.lineTo(7,-8);ctx.lineTo(7,-15);
+    ctx.lineTo(-25,-15);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.restore();
+  }
+  function drawPlatform(p){
+    if(p.isCrate){drawCrate(p);return;}
+    const th=currentTheme(),x=p.x,y=p.y,w=p.w,h=p.h;
+    const isGreen=!!p.isGreen,isApron=!!p.isApron;
+    // Golden, hand-drawn stone islands with darker edges and individually
+    // highlighted stones. All artwork uses the SAME collision rectangles.
+    const snowy=th.label==='Snowy',volcanic=th.label==='Volcanic',desert=th.label==='Desert';
+    const rockBase=snowy?'#b5c7d0':volcanic?'#60575c':desert?'#c99653':'#b57d49';
+    const rockLight=snowy?'#f4faff':volcanic?'#9a8a86':desert?'#f7d596':'#ffdda0';
+    const rockMid=snowy?'#e3edf2':volcanic?'#7d7272':desert?'#e7bb75':'#f6c57e';
+    const rockDark=snowy?'#839fae':volcanic?'#3b353e':desert?'#98683e':'#916039';
+    ctx.save();ctx.fillStyle=rockBase;inkStroke(rockDark,2.5);
+    roundedRectPath(x,y,w,h,Math.min(8,h*.14));ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.rect(x+3,y+6,Math.max(0,w-6),Math.max(0,h-9));ctx.clip();
+    const tw=26,thh=22,rows=Math.ceil(h/thh)+1,cols=Math.ceil(w/tw)+2;
+    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+      const sx=x+col*tw+(row%2?tw*.5:-tw*.1);
+      const sy=y+8+row*thh;
+      const noise=Math.sin(col*73.1+row*37.7+x*.123+y*.079);
+      const sw=tw-3+noise*2,sh=thh-2+noise*2;
+      ctx.fillStyle=(col+row)%3===0?rockLight:rockMid;
+      inkStroke(rockDark,1.15);
+      ctx.beginPath();ctx.moveTo(sx+3,sy+1);ctx.lineTo(sx+sw-5,sy+1);
+      ctx.quadraticCurveTo(sx+sw+1,sy+3,sx+sw-1,sy+sh-6);
+      ctx.lineTo(sx+sw-6,sy+sh);ctx.lineTo(sx+5,sy+sh-1);
+      ctx.quadraticCurveTo(sx-1,sy+sh-5,sx+3,sy+1);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,240,.78)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(sx+6,sy+5);ctx.lineTo(sx+sw-8,sy+5);ctx.stroke();
+    }
+    ctx.restore();
+    // Saturated grass silhouette, scalloped underside and bright highlight.
+    const grassDark=isGreen?'#246c3b':isApron?'#328145':th.grass1;
+    const grassLight=isGreen?'#a5ed6c':isApron?'#7ed259':th.grass2;
+    ctx.save();inkStroke('#285c32',2.6);ctx.fillStyle=grassDark;
+    ctx.beginPath();ctx.moveTo(x,y-7);ctx.lineTo(x+w,y-7);ctx.lineTo(x+w,y+10);
+    for(let px=x+w;px>=x;px-=13){ctx.quadraticCurveTo(px-5,y+16,Math.max(x,px-13),y+9);}
+    ctx.lineTo(x,y-7);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle=grassLight;ctx.beginPath();ctx.moveTo(x+3,y-7);
+    for(let px=x+5;px<x+w-4;px+=20){ctx.quadraticCurveTo(px+7,y-11,Math.min(px+20,x+w-4),y-7);}
+    ctx.lineTo(x+w-4,y-1);ctx.lineTo(x+3,y-1);ctx.closePath();ctx.fill();
+    if(isGreen){ctx.fillStyle='rgba(235,255,198,.28)';for(let gx=x+20;gx<x+w-15;gx+=37)ctx.fillRect(gx,y-6,15,6);}
+    if(!isGreen){
+      ctx.strokeStyle=th.tuft;ctx.lineWidth=2.2;
+      for(let gx=x+11;gx<x+w-9;gx+=29){ctx.beginPath();ctx.moveTo(gx-6,y-7);ctx.lineTo(gx-10,y-15);ctx.moveTo(gx-2,y-7);ctx.lineTo(gx,y-17);ctx.moveTo(gx+3,y-7);ctx.lineTo(gx+10,y-13);ctx.stroke();}
+    }
+    ctx.restore();
+    // Bushes and trees sit behind the ball and never count as hazards.
+    if(p.trees){for(const f of p.trees)drawTree(x+w*f,y-8,w>220?.65:.53);}
+    else if(!isGreen&&w>145&&!p.isApron&&((Math.floor(x+y)%3)!==0))drawBush(x+w*.72,y-7,.42);
+    if(p.isBonus)drawBush(x+w*.32,y-8,.44);
+    if(p.flowers&&!p.isApron){
+      const count=Math.min(3,Math.max(1,Math.floor(w/95)));
+      for(let i=0;i<count;i++)drawFlower(x+24+i*(w-48)/Math.max(1,count-1),y-7,i+Math.floor(x));
     }
   }
 
@@ -650,8 +790,21 @@
 
   function draw(){
     drawBackground();
-    ctx.strokeStyle='#e8dab0';ctx.lineWidth=10;ctx.strokeRect(5,5,W-10,H-10);
-    for(const p of currentHole().platforms)drawPlatform(p);
+    const h=currentHole();
+    // Solid terraces are rendered first; ladders then bridge their actual
+    // heights. They are visual route markers, not misleading extra collision.
+    for(const p of h.platforms)if(!p.isCrate)drawPlatform(p);
+    for(const p of h.platforms){
+      if(!p.isBonus||p.ladderTo===undefined)continue;
+      const base=h.mainPlatforms[p.ladderTo];
+      if(!base)continue;
+      const lx=clamp(p.x+p.w*.5,base.x+21,base.x+base.w-21);
+      drawLadder(lx,p.y+p.h-7,base.y+7);
+    }
+    for(const p of h.platforms)if(p.isCrate)drawCrate(p);
+    const first=h.mainPlatforms[0],direction=h.cup.x>h.start.x?1:-1;
+    const sx=first.x+first.w*(direction===1?.62:.38);
+    if(Math.abs(sx-h.start.x)>40)drawDirectionSign(sx,first.y-7,direction);
     drawCup();drawAim();drawBall();drawLossEffect();
   }
 
