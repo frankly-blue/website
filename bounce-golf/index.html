@@ -147,7 +147,7 @@
     <div id="powerWrap"><div id="powerBar"><div id="powerFill"></div></div><div id="powerText">Power 20%</div></div>
     <div id="secondaryControls"><button id="resetBtn">Reset Ball</button><button id="pauseBtn">Pause</button></div>
   </div>
-  <div id="tip">Tap anywhere to aim. Hold HIT to charge, release to strike. Each hole gives you a random ball type, and each theme has different ground physics. Once you reach the platform with the hole, the game switches to putting: shots can only travel left or right along the grass. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
+  <div id="tip">Tap to aim, then hold HIT and release. Each hole starts with a random ball and its own ground physics. When your ball reaches the hole’s green, it switches to a normal white golf ball with consistent putting physics: putts go only left or right along the green. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
 </div>
 <script>
 (()=>{
@@ -170,9 +170,9 @@
   let holes=[];
 
   let holeIndex=0,strokes=0,totalScore=0,results=[],playing=false,paused=false;
-  let ball={x:0,y:0,vx:0,vy:0,moving:false,grounded:false,lost:false,sinking:false,holed:false,sinkStart:0,sinkSurfaceY:0};
+  let ball={x:0,y:0,vx:0,vy:0,moving:false,grounded:false,lost:false,sinking:false,holed:false,onGreen:false,sinkStart:0,sinkSurfaceY:0};
   let angle=-Math.PI/4,power=20,charging=false,chargeStart=0,chargeRAF=null;
-  let lastTime=performance.now(),restTimer=0,lastSafe={x:0,y:0};
+  let lastTime=performance.now(),restTimer=0,lastSafe={x:0,y:0,onGreen:false};
   let selectedDifficulty='medium';
   let selectedBallType='standard',choosingBall=false,lossEffect=null;
 
@@ -222,7 +222,21 @@
     const a=backdropChoices[themeKey]||['hills'];
     return a[randInt(0,a.length-1)];
   };
-  const surfacePhysics=()=>currentTheme();
+  // Every cup platform is a true putting green: consistent grass physics in all worlds.
+  const greenSurface={surface:'Putting green',groundBounce:.20,landingGrip:1,rollDecay:1.004,puttSpeed:1,wallBounce:1,cupCatch:1.55};
+  const onGreenPlatform=()=>{
+    if(!ball.onGreen)return false;
+    const p=cupPlatform();
+    return !!p&&ball.x>=p.x-BALL_R&&ball.x<=p.x+p.w+BALL_R&&Math.abs(ball.y+BALL_R-p.y)<15;
+  };
+  const surfacePhysics=()=>onGreenPlatform()?greenSurface:currentTheme();
+  function activatePuttingGreen(){
+    if(ball.onGreen)return;
+    ball.onGreen=true;
+    selectedBallType='standard'; // The random ball is used until the putting green.
+    showMessage('Putting green — normal ball!',950);
+    updateHud();
+  }
 
   function generateHole(idx,difficulty,themeKey,layoutType){
     const cfg=difficultySettings[difficulty];
@@ -331,8 +345,8 @@
     holeIndex=idx; if(resetStrokes)strokes=0;
     const h=currentHole();
     selectedBallType=h.ballType||randomBallKey();
-    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.lost=false;ball.sinking=false;ball.holed=false;
-    lastSafe={x:ball.x,y:ball.y};restTimer=0;lossEffect=null;
+    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;
+    lastSafe={x:ball.x,y:ball.y,onGreen:false};restTimer=0;lossEffect=null;
     const dx=h.cup.x-ball.x,dy=(h.cup.y-16)-ball.y;angle=Math.atan2(dy,dx);
     power=20;updatePower();updateHud();
   }
@@ -344,8 +358,8 @@
     strokeHud.textContent=`Strokes ${strokes}`;
     scoreHud.textContent=`Score ${scoreText(totalScore)}`;
     dirHud.textContent=h.cup.y<ball.y?'Goal ↑':h.cup.y>ball.y?'Goal ↓':'Goal →';
-    ballHud.textContent=`Ball ${currentBall().label} · ${currentTheme().label}`;
-    dirHud.title=currentTheme().surface;
+    ballHud.textContent=ball.onGreen?`Ball Standard · Green`:`Ball ${currentBall().label} · ${currentTheme().label}`;
+    dirHud.title=onGreenPlatform()?'Normal putting green':currentTheme().surface;
     updateControlMode();
   }
 
@@ -469,9 +483,10 @@
       ctx.strokeStyle=th.crack;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx+7,my+5);ctx.lineTo(mx+3,my+13);ctx.stroke();
     }
 
-    ctx.fillStyle=th.grass1;roundedRectPath(p.x-3,p.y-5,p.w+6,18,9);ctx.fill();
-    ctx.fillStyle=th.grass2;roundedRectPath(p.x,p.y-7,p.w,10,6);ctx.fill();
-    ctx.fillStyle=th.tuft;
+    const isPuttingGreen=p===cupPlatform();
+    ctx.fillStyle=isPuttingGreen?'#297e49':th.grass1;roundedRectPath(p.x-3,p.y-5,p.w+6,18,9);ctx.fill();
+    ctx.fillStyle=isPuttingGreen?'#78d68a':th.grass2;roundedRectPath(p.x,p.y-7,p.w,10,6);ctx.fill();
+    ctx.fillStyle=isPuttingGreen?'#266f3c':th.tuft;
     for(let gx=p.x+5;gx<p.x+p.w-4;gx+=18){
       const drop=5+(((gx+p.y)|0)%9);ctx.beginPath();ctx.moveTo(gx,p.y+7);ctx.lineTo(gx+5,p.y+7+drop);ctx.lineTo(gx+10,p.y+7);ctx.closePath();ctx.fill();
     }
@@ -565,11 +580,12 @@
 
   function resolvePlatform(p,prevX,prevY){
     const hit=circleRectCollision(p);if(!hit)return false;
+    const wasAbove=prevY+BALL_R<=p.y+2,wasBelow=prevY-BALL_R>=p.y+p.h-2,wasLeft=prevX+BALL_R<=p.x+2,wasRight=prevX-BALL_R>=p.x+p.w-2;
+    if(p===cupPlatform()&&(wasAbove||(ball.y<p.y&&ball.vy>=0)))activatePuttingGreen();
     const bt=currentBall(),sf=surfacePhysics();
     const groundBounce=bt.grassBounce*sf.groundBounce;
     const landingGrip=bt.landingGrip*sf.landingGrip;
     const wallBounce=bt.wallBounce*sf.wallBounce;
-    const wasAbove=prevY+BALL_R<=p.y+2,wasBelow=prevY-BALL_R>=p.y+p.h-2,wasLeft=prevX+BALL_R<=p.x+2,wasRight=prevX-BALL_R>=p.x+p.w-2;
     if(wasAbove){
       const impact=Math.abs(ball.vy);
       ball.y=p.y-BALL_R;
@@ -604,7 +620,7 @@
   function checkCup(){
     if(ball.sinking||ball.lost||ball.holed)return false;
     const h=currentHole(),surfaceY=cupSurfaceY(h);
-    const closeX=Math.abs(ball.x-h.cup.x)<15;
+    const closeX=Math.abs(ball.x-h.cup.x)<(ball.onGreen?20:15);
     const onSurface=ball.y+BALL_R>=surfaceY-3&&ball.y<=surfaceY+5;
     if(closeX&&onSurface&&speed()<currentBall().cupSpeed*surfacePhysics().cupCatch){
       ball.x=h.cup.x;ball.y=surfaceY-BALL_R;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=false;
@@ -625,6 +641,7 @@
     setTimeout(()=>{
       if(!playing)return;
       ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.lost=false;restTimer=0;
+      ball.onGreen=!!lastSafe.onGreen;selectedBallType=ball.onGreen?'standard':currentHole().ballType;
       showMessage('Play again from the last spot',750);updateHud();
     },700);
   }
@@ -652,14 +669,14 @@
     if(ball.grounded&&ball.vy===0){
       const surfaceDecay=Math.min(.9988,bt.rollDecay*sf.rollDecay);
       ball.vx*=Math.pow(surfaceDecay,dt*60);
-      const stopSpeed=sf.surface==='Soft sand'?5:sf.surface==='Slippery snow'?3:7;
+      const stopSpeed=ball.onGreen&&onGreenPlatform()?4:sf.surface==='Soft sand'?5:sf.surface==='Slippery snow'?3:7;
       if(Math.abs(ball.vx)<stopSpeed)ball.vx=0;
     }
 
     const sp=speed();
     if(sp<11&&ball.grounded){
       restTimer+=dt;
-      if(restTimer>.28){ball.vx=ball.vy=0;ball.moving=false;lastSafe={x:ball.x,y:ball.y};showMessage('Ready for next shot',650);updateHud();}
+      if(restTimer>.28){ball.vx=ball.vy=0;ball.moving=false;lastSafe={x:ball.x,y:ball.y,onGreen:onGreenPlatform()};showMessage('Ready for next shot',650);updateHud();}
     }else restTimer=0;
   }
 
@@ -670,7 +687,13 @@
     if(putting){
       // On the cup platform every shot is a true putt: horizontal only, no loft.
       const dir=Math.cos(angle)<0?-1:1;
-      const sp=(55+power*3.2)*currentBall().putt*surfacePhysics().puttSpeed;
+      activatePuttingGreen();
+      // Standard white ball, consistent green friction, and power scaled to cup distance.
+      // A moderate charge can reach the cup even on a long putting green.
+      const dist=Math.abs(currentHole().cup.x-ball.x);
+      const targetSpeed=clamp(65+dist*.56,115,340);
+      const powerFactor=.82+(power/100)*.55;
+      const sp=targetSpeed*powerFactor;
       ball.vx=dir*sp;ball.vy=0;ball.grounded=true;
     }else{
       const sp=(300+power*5.6)*currentBall().launch;
@@ -738,7 +761,7 @@
 
   function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
 
-  function resetBall(){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.grounded=true;showMessage('Ball reset',600)}
+  function resetBall(){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.grounded=true;ball.onGreen=!!lastSafe.onGreen;selectedBallType=ball.onGreen?'standard':currentHole().ballType;showMessage('Ball reset',600);updateHud()}
   function adjustAngle(delta){
     if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
     if(puttingMode()){
