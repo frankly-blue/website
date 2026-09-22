@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Bounce Golf</title>
+<title>Bounce Golf · Long Islands</title>
+<meta name="bounce-golf-version" content="2026-09-22-long-islands-v1">
 <style>
   :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -92,7 +93,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
-        <p>Side-view platform golf. Every round creates fresh islands, themes and ball types. Snow slides, sand slows you down, jungle turf grips, and volcanic rock gives harder rebounds.</p>
+        <p>Side-view platform golf. Every round creates long islands, occasional connected steps, fresh themes and random ball types. Snow slides, sand slows you down, jungle turf grips, and volcanic rock gives harder rebounds.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
           <button class="diffBtn" data-difficulty="easy">Easy</button>
@@ -147,7 +148,7 @@
     <div id="powerWrap"><div id="powerBar"><div id="powerFill"></div></div><div id="powerText">Power 20%</div></div>
     <div id="secondaryControls"><button id="resetBtn">Reset Ball</button><button id="pauseBtn">Pause</button></div>
   </div>
-  <div id="tip">Tap to aim, then hold HIT and release. Each hole starts with a random ball and its own ground physics. Sticky balls cling to any solid platform or screen wall, but not the bottom hazard. When your ball reaches the hole’s green, it switches to a normal white golf ball with consistent putting physics: putts go only left or right along the green. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
+  <div id="tip">Tap to aim, then hold HIT and release. Each hole starts with a random ball and its own ground physics. Sticky balls cling to any solid platform or screen wall, but not the bottom hazard. The final island has a longer green and sometimes a connected approach. Landing on its grass gives you a normal white ball; once it stops, putt left or right towards the cup. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
 </div>
 <script>
 (()=>{
@@ -186,9 +187,9 @@
   const lerp=(a,b,t)=>a+(b-a)*t;
 
   const difficultySettings={
-    easy:{count:[3,5],width:[185,275],gap:[26,58],jitterY:32,maxStep:122,height:[68,118],label:'Easy'},
-    medium:{count:[3,6],width:[155,240],gap:[38,82],jitterY:62,maxStep:150,height:[70,142],label:'Medium'},
-    hard:{count:[4,7],width:[120,205],gap:[50,102],jitterY:92,maxStep:182,height:[62,138],label:'Hard'}
+    easy:{count:[3,5],width:[155,225],gap:[32,62],jitterY:32,maxStep:122,height:[68,118],label:'Easy'},
+    medium:{count:[3,6],width:[125,205],gap:[45,88],jitterY:62,maxStep:150,height:[70,142],label:'Medium'},
+    hard:{count:[4,7],width:[96,170],gap:[58,108],jitterY:92,maxStep:182,height:[62,138],label:'Hard'}
   };
 
   const ballTypes={
@@ -227,7 +228,7 @@
     return a[randInt(0,a.length-1)];
   };
   // Every cup platform is a true putting green: consistent grass physics in all worlds.
-  const greenSurface={surface:'Putting green',groundBounce:.20,landingGrip:1,rollDecay:1.004,puttSpeed:1,wallBounce:1,cupCatch:1.55};
+  const greenSurface={surface:'Putting green',groundBounce:.20,landingGrip:1,rollDecay:.998,puttSpeed:1,wallBounce:1,cupCatch:1.25};
   function supportPlatform(x=ball.x,y=ball.y){
     if(!holes.length)return null;
     return currentHole().platforms.find(p=>
@@ -248,36 +249,70 @@
 
   function generateHole(idx,difficulty,themeKey,layoutType){
     const cfg=difficultySettings[difficulty];
-    const count=randInt(cfg.count[0],cfg.count[1]);
+    // Fewer, longer islands leave room for meaningful landings and connected steps.
+    const count=randInt(...(difficulty==='easy'?[3,4]:difficulty==='medium'?[3,5]:[4,5]));
     const dir=Math.random()<.5?1:-1;
-    const margin=24,targetWidth=W-margin*2;
+    const margin=24,available=W-margin*2;
+    const greenWidth=rand(difficulty==='hard'?235:270,difficulty==='easy'?340:320);
+    const longIndex=count>3?randInt(1,count-2):randInt(0,count-2);
+    const widths=Array.from({length:count},(_,i)=>
+      i===count-1?greenWidth:
+      i===longIndex?rand(245,345):
+      i===0?rand(175,230):rand(145,220));
 
-    // Build varied widths. At least some holes contain a noticeably long landing island.
-    let widths=Array.from({length:count},(_,i)=>rand(cfg.width[0],cfg.width[1])*(i===0||i===count-1?1.08:1));
-    if(Math.random()<.90){
-      const longIndex=randInt(0,count-1);
-      widths[longIndex]*=rand(1.45,2.05);
-      if(count>=5&&Math.random()<.28){
-        let second=randInt(0,count-1);if(second===longIndex)second=(second+2)%count;
-        widths[second]*=rand(1.20,1.55);
+    // Zero gap means two islands genuinely meet. A joined pair is a short
+    // step rather than a huge, unplayable wall.
+    const gaps=Array.from({length:count-1},(_,i)=>{
+      if(i===count-2)return Math.random()<.72?0:rand(25,56);
+      return Math.random()<.38?0:rand(cfg.gap[0],cfg.gap[1]);
+    });
+    // Most holes have at least one connected pair, not just random close gaps.
+    if(!gaps.some(g=>g===0)&&Math.random()<.72)gaps[randInt(0,gaps.length-1)]=0;
+
+    let gapTotal=gaps.reduce((a,b)=>a+b,0);
+    let widthTotal=widths.reduce((a,b)=>a+b,0);
+    // Shrink open gaps first; keep connected pairs exactly connected.
+    if(gapTotal+widthTotal>available){
+      const gapBudget=Math.max(0,available-widthTotal);
+      if(gapTotal>0){
+        const ratio=gapBudget/gapTotal;
+        for(let i=0;i<gaps.length;i++)if(gaps[i]>0)gaps[i]=Math.max(25,gaps[i]*ratio);
       }
     }
-    let gaps=Array.from({length:count-1},()=>rand(cfg.gap[0],cfg.gap[1]));
-    let total=widths.reduce((a,b)=>a+b,0)+gaps.reduce((a,b)=>a+b,0);
-    if(total>targetWidth){
-      // Shrink gaps first, then scale the full layout only if needed.
-      gaps=gaps.map(g=>Math.max(24,g*.72));
-      total=widths.reduce((a,b)=>a+b,0)+gaps.reduce((a,b)=>a+b,0);
-      if(total>targetWidth){
-        const scale=targetWidth/total;
-        widths=widths.map(v=>Math.max(82,v*scale));
-        gaps=gaps.map(v=>Math.max(20,v*scale));
-        total=widths.reduce((a,b)=>a+b,0)+gaps.reduce((a,b)=>a+b,0);
+    gapTotal=gaps.reduce((a,b)=>a+b,0);
+    widthTotal=widths.reduce((a,b)=>a+b,0);
+    if(gapTotal+widthTotal>available){
+      // Preserve at least one long landing island and a broad final green.
+      // Shrink ordinary islands first; a crowded layout never creates tiny
+      // slivers that are impossible to land on.
+      let overflow=gapTotal+widthTotal-available;
+      const ordinary=Array.from({length:count-1},(_,i)=>i).filter(i=>i!==longIndex);
+      const order=[...ordinary,longIndex,count-1];
+      for(const i of order){
+        const minimum=i===count-1?235:i===longIndex?200:100;
+        const take=Math.min(overflow,Math.max(0,widths[i]-minimum));
+        widths[i]-=take;overflow-=take;
+      }
+      if(overflow>0){
+        for(let i=0;i<count-1&&overflow>0;i++){
+          const take=Math.min(overflow,Math.max(0,widths[i]-90));
+          widths[i]-=take;overflow-=take;
+        }
+      }
+      if(overflow>0){
+        const take=Math.min(overflow,Math.max(0,widths[count-1]-215));
+        widths[count-1]-=take;overflow-=take;
       }
     }
-    const spare=Math.max(0,targetWidth-total),leftOffset=margin+spare/2;
-    const xs=[];let cursor=leftOffset;
-    for(let i=0;i<count;i++){xs.push(cursor);cursor+=widths[i]+(gaps[i]||0);}
+    const used=widths.reduce((a,b)=>a+b,0)+gaps.reduce((a,b)=>a+b,0);
+    const spare=Math.max(0,available-used);
+    let cursor=dir===1?margin+spare/2:W-margin-spare/2;
+    const xs=[];
+    for(let i=0;i<count;i++){
+      const x=dir===1?cursor:cursor-widths[i];
+      xs.push(x);
+      cursor+=(dir===1?1:-1)*(widths[i]+(gaps[i]||0));
+    }
 
     const hazardDepth=(themes[themeKey]?.hazardDepth||60);
     const topY=135,bottomY=Math.max(310,H-hazardDepth-82);
@@ -285,7 +320,6 @@
     const mid=()=>rand(topY+85,Math.max(topY+115,bottomY-85));
     const low=()=>rand(Math.max(topY+170,bottomY-135),bottomY);
     let startY,endY;
-
     if(layoutType==='climb'){startY=low();endY=high();}
     else if(layoutType==='descend'){startY=high();endY=low();}
     else if(layoutType==='flat'){startY=mid();endY=clamp(startY+rand(-55,55),topY,bottomY);}
@@ -294,74 +328,58 @@
     else if(layoutType==='zigzag'){startY=rand(topY+30,bottomY-30);endY=rand(topY+30,bottomY-30);}
     else{startY=rand(topY,bottomY);endY=rand(topY,bottomY);}
 
-    const path=[];let previousY=startY;
+    const ys=[];
     for(let i=0;i<count;i++){
       const u=i/(count-1);
       let y;
       if(i===0)y=startY;
       else if(i===count-1)y=endY;
-      else if(layoutType==='valley'){
-        // Coordinate y grows downward: a valley dips lower in the middle.
-        y=lerp(startY,endY,u)+Math.sin(Math.PI*u)*rand(95,Math.min(210,cfg.maxStep*1.25));
-      }else if(layoutType==='peak'){
-        y=lerp(startY,endY,u)-Math.sin(Math.PI*u)*rand(95,Math.min(210,cfg.maxStep*1.25));
-      }else if(layoutType==='zigzag'){
-        const sign=i%2?1:-1;
-        y=mid()+sign*rand(55,Math.min(145,cfg.jitterY+70));
-      }else if(layoutType==='rolling'){
-        y=lerp(startY,endY,u)+Math.sin(u*Math.PI*2+idx)*rand(35,95)+rand(-25,25);
-      }else{
-        y=lerp(startY,endY,u)+rand(-cfg.jitterY,cfg.jitterY);
+      else if(layoutType==='valley')y=lerp(startY,endY,u)+Math.sin(Math.PI*u)*rand(95,Math.min(210,cfg.maxStep*1.25));
+      else if(layoutType==='peak')y=lerp(startY,endY,u)-Math.sin(Math.PI*u)*rand(95,Math.min(210,cfg.maxStep*1.25));
+      else if(layoutType==='zigzag')y=mid()+(i%2?1:-1)*rand(55,Math.min(145,cfg.jitterY+70));
+      else if(layoutType==='rolling')y=lerp(startY,endY,u)+Math.sin(u*Math.PI*2+idx)*rand(35,95)+rand(-25,25);
+      else y=lerp(startY,endY,u)+rand(-cfg.jitterY,cfg.jitterY);
+      if(i>0)y=clamp(y,ys[i-1]-cfg.maxStep,ys[i-1]+cfg.maxStep);
+      ys.push(clamp(y,topY,bottomY));
+    }
+    for(let i=1;i<count;i++){
+      if(gaps[i-1]===0&&i!==count-1){
+        // Connected steps are 16–42 pixels high, in either direction.
+        const sign=Math.random()<.5?-1:1;
+        ys[i]=clamp(ys[i-1]+sign*rand(16,42),topY,bottomY);
       }
-      if(i>0)y=clamp(y,previousY-cfg.maxStep,previousY+cfg.maxStep);
-      y=clamp(y,topY,bottomY);
-
-      // Some neighbouring islands form one continuous stepped landform.
-      // They can touch/overlap horizontally while their tops sit at different heights.
-      if(i>0 && Math.random()<(difficulty==='easy'?.34:difficulty==='medium'?.27:.20)){
-        const prevSortedIndex=dir===1?i-1:count-i;
-        const thisSortedIndex=dir===1?i:count-1-i;
-        const prevRight=xs[prevSortedIndex]+widths[prevSortedIndex];
-        if(dir===1){
-          xs[thisSortedIndex]=prevRight-rand(4,18);
-        }else{
-          xs[thisSortedIndex]=xs[prevSortedIndex]-widths[thisSortedIndex]+rand(4,18);
-        }
-        // Keep a visible step instead of making a flat merged platform.
-        const step=rand(28,Math.min(82,cfg.maxStep*.58))*(Math.random()<.5?-1:1);
-        y=clamp(previousY+step,topY,bottomY);
-      }
-      previousY=y;
-      const sortedIndex=dir===1?i:count-1-i;
-      const p={x:xs[sortedIndex],y,w:widths[sortedIndex],h:rand(cfg.height[0],cfg.height[1]),flowers:Math.random()<.72};
-      if(Math.random()<(difficulty==='hard'?.34:.55))p.trees=[rand(.20,.80)];
-      path.push(p);
+    }
+    if(gaps[count-2]===0){
+      // The approach apron meets the green, level or with a small downhill
+      // step. A ball can roll onto it instead of requiring another jump.
+      ys[count-1]=clamp(ys[count-2]+rand(0,10),topY,bottomY);
+    }else{
+      // A separate final island is still a reasonable landing target.
+      ys[count-1]=clamp(ys[count-1],ys[count-2]-Math.min(85,cfg.maxStep),ys[count-2]+Math.min(85,cfg.maxStep));
     }
 
-    const startPlatform=path[0],cupPlatform=path[path.length-1];
-
-    // Make the final island feel like a real green rather than a small target shelf.
-    // It is broad enough to land on, but the cup is not sitting beside the cliff edge.
-    const greenMin=difficulty==='easy'?250:difficulty==='medium'?225:205;
-    cupPlatform.w=Math.max(cupPlatform.w,Math.min(greenMin,W-cupPlatform.x-24));
-    if(dir===-1 && cupPlatform.x+cupPlatform.w>W-24){
-      cupPlatform.x=Math.max(24,W-24-cupPlatform.w);
+    const path=Array.from({length:count},(_,i)=>({
+      x:xs[i],y:ys[i],w:widths[i],h:rand(cfg.height[0],cfg.height[1]),
+      flowers:Math.random()<.65,joinedToNext:i<count-1&&gaps[i]===0,
+      isGreen:i===count-1,isApron:i===count-2&&gaps[i]===0,
+      approachDir:dir
+    }));
+    for(let i=0;i<count-1;i++){
+      if(Math.random()<(difficulty==='hard'?.3:.48)&&!path[i].isApron)path[i].trees=[rand(.2,.8)];
     }
-    // Keep the approach to the green reasonably gentle so it remains fair.
-    if(path.length>1){
-      const approach=path[path.length-2];
-      cupPlatform.y=clamp(cupPlatform.y,approach.y-105,approach.y+105);
-    }
+    // No tree or flower obstacles around the cup or on the approach apron.
+    path[count-1].flowers=false;
+    if(path[count-2].isApron){path[count-2].flowers=false;delete path[count-2].trees;}
 
-    const startX=startPlatform.x+startPlatform.w*(dir===1?.27:.73);
-    // Cup sits well inside the green. The far side still rewards a controlled landing,
-    // without requiring several tiny putts after a successful approach.
-    const cupFraction=dir===1?rand(.58,.70):rand(.30,.42);
-    const cupX=cupPlatform.x+cupPlatform.w*cupFraction;
+    const startPlatform=path[0],green=path[count-1];
+    const startX=startPlatform.x+startPlatform.w*(dir===1?.24:.76);
+    // Cup is well inside the green, not perched at its far edge. Its landing
+    // apron and generous run-off allow an ordinary one- or two-putt finish.
+    const cupX=green.x+green.w*(dir===1?.64:.36);
     const par=Math.max(3,count+(difficulty==='easy'?0:1));
     return {
       par,theme:themeKey,backdrop:randomBackdrop(themeKey),layout:layoutType,ballType:randomBallKey(),
-      start:{x:startX,y:startPlatform.y},cup:{x:cupX,y:cupPlatform.y},platforms:path
+      start:{x:startX,y:startPlatform.y},cup:{x:cupX,y:green.y},platforms:path
     };
   }
 
@@ -525,12 +543,28 @@
       ctx.strokeStyle=th.crack;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx+7,my+5);ctx.lineTo(mx+3,my+13);ctx.stroke();
     }
 
-    const isPuttingGreen=p===cupPlatform();
-    ctx.fillStyle=isPuttingGreen?'#297e49':th.grass1;roundedRectPath(p.x-3,p.y-5,p.w+6,18,9);ctx.fill();
-    ctx.fillStyle=isPuttingGreen?'#78d68a':th.grass2;roundedRectPath(p.x,p.y-7,p.w,10,6);ctx.fill();
-    ctx.fillStyle=isPuttingGreen?'#266f3c':th.tuft;
-    for(let gx=p.x+5;gx<p.x+p.w-4;gx+=18){
-      const drop=5+(((gx+p.y)|0)%9);ctx.beginPath();ctx.moveTo(gx,p.y+7);ctx.lineTo(gx+5,p.y+7+drop);ctx.lineTo(gx+10,p.y+7);ctx.closePath();ctx.fill();
+    const isPuttingGreen=p.isGreen;
+    const isApron=p.isApron;
+    ctx.fillStyle=isPuttingGreen?'#397e48':isApron?'#4b9654':th.grass1;
+    roundedRectPath(p.x-3,p.y-5,p.w+6,18,9);ctx.fill();
+    ctx.fillStyle=isPuttingGreen?'#80ca82':isApron?'#72bb70':th.grass2;
+    roundedRectPath(p.x,p.y-7,p.w,10,6);ctx.fill();
+    if(isPuttingGreen){
+      // Subtle alternating mown stripes and a blended landing apron make the
+      // final island look like a proper green, not a different type of block.
+      ctx.save();ctx.globalAlpha=.18;ctx.fillStyle='#e8ffe1';
+      for(let gx=p.x+18;gx<p.x+p.w-18;gx+=40)ctx.fillRect(gx,p.y-7,18,10);
+      ctx.globalAlpha=.8;ctx.fillStyle='#a3d996';
+      const apronW=Math.min(66,p.w*.24);
+      const apronX=p.approachDir===1?p.x:p.x+p.w-apronW;
+      roundedRectPath(apronX,p.y-7,apronW,10,5);ctx.fill();ctx.restore();
+    }
+    if(!isPuttingGreen){
+      ctx.fillStyle=isApron?'#387943':th.tuft;
+      for(let gx=p.x+5;gx<p.x+p.w-4;gx+=18){
+        const drop=isApron?3:5+(((gx+p.y)|0)%9);
+        ctx.beginPath();ctx.moveTo(gx,p.y+7);ctx.lineTo(gx+5,p.y+7+drop);ctx.lineTo(gx+10,p.y+7);ctx.closePath();ctx.fill();
+      }
     }
 
     if(p.trees){for(const f of p.trees)drawTree(p.x+p.w*f,p.y-5, p.w>220?.9:.72)}
@@ -581,9 +615,9 @@
     const h=currentHole(),x=h.cup.x,y=cupSurfaceY(h);
     // The cup is cut into the grass surface, not floating above it.
     ctx.save();
-    ctx.fillStyle='#151515';ctx.beginPath();ctx.ellipse(x,y-1,15,5,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#f6f2df';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y-2);ctx.lineTo(x,y-70);ctx.stroke();
-    ctx.fillStyle='#e84d4d';ctx.beginPath();ctx.moveTo(x,y-70);ctx.lineTo(x+35,y-58);ctx.lineTo(x,y-47);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#151515';ctx.beginPath();ctx.ellipse(x,y-1,16,4.8,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#f6f2df';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y-2);ctx.lineTo(x,y-53);ctx.stroke();
+    ctx.fillStyle='#e84d4d';ctx.beginPath();ctx.moveTo(x,y-53);ctx.lineTo(x+30,y-44);ctx.lineTo(x,y-34);ctx.closePath();ctx.fill();
     ctx.restore();
   }
 
@@ -644,7 +678,7 @@
     // The old generic collision branch would hold it up by a platform corner.
     if(selectedBallType!=='sticky'&&!topSupported&&
        ball.y<p.y+BALL_R*.70&&prevY<=p.y+BALL_R)return false;
-    if(p===cupPlatform()&&topSupported&&fallingOntoTop)activatePuttingGreen();
+    if(p===cupPlatform()&&topSupported&&fallingOntoTop&&ball.y<=p.y+BALL_R*.5)activatePuttingGreen();
 
     // A sticky ball adheres to every solid platform face, including sides and
     // undersides, without falling away. The cup's top is the exception: it
@@ -721,9 +755,13 @@
   function checkCup(){
     if(ball.sinking||ball.lost||ball.holed)return false;
     const h=currentHole(),surfaceY=cupSurfaceY(h);
-    const closeX=Math.abs(ball.x-h.cup.x)<(ball.onGreen?20:15);
+    const cupDistance=Math.abs(ball.x-h.cup.x);
     const onSurface=ball.y+BALL_R>=surfaceY-3&&ball.y<=surfaceY+5;
-    if(closeX&&onSurface&&speed()<currentBall().cupSpeed*surfacePhysics().cupCatch){
+    // A slow putt can be caught near the lip; a faster ball must pass close
+    // to the middle. Airborne shots cannot be magnetically pulled into it.
+    const catchSpeed=ball.onGreen?205:currentBall().cupSpeed;
+    const catchRadius=ball.onGreen?(speed()<105?23:17):14;
+    if(cupDistance<catchRadius&&onSurface&&Math.abs(ball.vy)<65&&speed()<catchSpeed){
       ball.x=h.cup.x;ball.y=surfaceY-BALL_R;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=false;
       ball.sinking=true;ball.sinkStart=performance.now();ball.sinkSurfaceY=surfaceY;
       showMessage('In the hole!',700);
