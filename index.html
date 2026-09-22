@@ -1,62 +1,810 @@
-<!-- Type exclamation mark and choose first option, boiler plate... -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>   <!--Additional info and links for the webpage  -->
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <link rel="stylesheet" type="text/css" href="main.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bunny Blue Lion</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com"> 
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
-    <link href="https://fonts.googleapis.com/css2?family=Comfortaa&display=swap" rel="stylesheet">
-    <script data-ad-client="ca-pub-8307023246036652" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bounce Golf</title>
+<style>
+  :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:#153a2b;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);touch-action:manipulation}
+  body{display:flex;justify-content:center;min-height:100vh;padding:4px}
+  #gameShell{width:min(100%,1180px)}
+  #hud{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:7px}
+  .hudBox{background:rgba(255,248,230,.96);border-radius:11px;padding:7px 6px;text-align:center;font-weight:900;font-size:13px;box-shadow:0 2px 0 rgba(0,0,0,.13)}
+  #stage{position:relative;background:#9fd6f6;border:4px solid #f6e8bd;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+  canvas{display:block;width:100%;height:auto;background:#a8dcff}
+  #message{position:absolute;left:50%;top:12%;transform:translateX(-50%);background:rgba(255,248,230,.95);padding:8px 14px;border-radius:999px;font-weight:900;opacity:0;transition:.18s;pointer-events:none;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+  #message.show{opacity:1}
+  #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(16,42,31,.78);z-index:10}
+  #overlay.hidden{display:none}
+  .card{width:min(92%,460px);background:#fff9e8;border-radius:22px;padding:22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .card h1,.card h2{margin:0 0 8px}.card p{margin:7px 0 15px;color:#4e675b;font-weight:650}
+  .card button{width:100%;margin-top:8px}
+  .victoryCard{background:linear-gradient(160deg,#fffdf3,#fff2b8);border:4px solid #e3aa35;overflow:hidden;position:relative}
+  .victoryCard:before,.victoryCard:after{content:'✦  ✧  ✦  ✧  ✦';position:absolute;left:0;right:0;color:#e3aa35;font-size:22px;letter-spacing:7px;opacity:.72;pointer-events:none}
+  .victoryCard:before{top:8px;animation:sparkle 1s ease-in-out infinite alternate}.victoryCard:after{bottom:8px;animation:sparkle 1s .35s ease-in-out infinite alternate}
+  .victoryBurst{font-size:54px;line-height:1;margin:4px 0 7px;animation:victoryPop .65s cubic-bezier(.2,.9,.25,1.35) both}
+  .victoryTitle{font-size:32px!important;color:#245f3d;text-transform:uppercase;letter-spacing:.035em}
+  .winResult{display:inline-block;margin:8px 0 5px;padding:7px 18px;border-radius:999px;background:#2d6749;color:#fff;font-size:25px;font-weight:1000;box-shadow:0 4px 0 #173b2a;animation:victoryPop .55s .12s cubic-bezier(.2,.9,.25,1.3) both}
+  .finalScoreBanner{margin:8px auto 12px;padding:9px 16px;width:max-content;max-width:100%;border-radius:14px;background:#e3aa35;color:#263320;font-size:22px;font-weight:1000;box-shadow:0 4px 0 #9d711a}
+  #endCard{max-height:92%;overflow-y:auto;padding-bottom:14px}
+  .endActions{position:sticky;bottom:-1px;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;padding:10px 0 2px;background:linear-gradient(180deg,rgba(255,247,198,0),#fff2b8 28%)}
+  .endActions button{margin:0!important;min-height:52px}
+  #endMenuBtn{background:#486154;box-shadow:0 3px 0 #28392f}
+  @keyframes victoryPop{0%{transform:scale(.3) rotate(-7deg);opacity:0}75%{transform:scale(1.12) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+  @keyframes sparkle{from{transform:translateY(-2px) scale(.92);opacity:.35}to{transform:translateY(2px) scale(1.05);opacity:.9}}
+  .difficultyLabel{font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#61766b;margin-top:12px}
+  .difficultyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:7px 0 9px}
+  .difficultyGrid .diffBtn{width:auto;min-height:46px;margin:0;background:#6b8175;box-shadow:0 3px 0 #405147;font-size:14px;padding:8px}
+  .difficultyGrid .diffBtn.selected{background:#2d6749;box-shadow:0 3px 0 #173b2a;outline:3px solid #e3aa35}
+  .ballGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 4px}
+  .ballBtn{min-height:84px!important;margin:0!important;padding:9px!important;background:#edf1e9!important;color:#20382b!important;box-shadow:0 3px 0 #b9c5b9!important;border:2px solid transparent!important;display:grid;grid-template-columns:42px 1fr;grid-template-rows:auto auto;align-items:center;text-align:left;column-gap:8px}
+  .ballBtn:active{transform:translateY(2px)}
+  .ballDot{grid-row:1/3;width:34px;height:34px;border-radius:50%;border:2px solid rgba(0,0,0,.18);box-shadow:inset -5px -6px 0 rgba(0,0,0,.09)}
+  .ballBtn strong{font-size:15px}.ballBtn small{font-size:11px;line-height:1.15;color:#5d7065;font-weight:750}
+  .ball-standard{background:#fff}.ball-heavy{background:#5f6670}.ball-bouncy{background:#ff8a2a}.ball-sticky{background:#62b84f}
+  #controls{display:grid;grid-template-columns:1fr 1.25fr;gap:7px;margin-top:8px}
+  #aimControls{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  button{border:0;border-radius:14px;min-height:58px;padding:10px 12px;font:900 16px system-ui;color:white;background:#2d6749;box-shadow:0 3px 0 #173b2a;touch-action:none}
+  button:active{transform:translateY(2px);box-shadow:0 1px 0 #173b2a}
+  #hitBtn{background:#e2ab35;color:#27301f;box-shadow:0 3px 0 #9d711a;font-size:20px}
+  #secondaryControls{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  #secondaryControls button{min-height:44px;background:#486154;font-size:14px;box-shadow:0 2px 0 #28392f}
+  #powerWrap{grid-column:1/-1;background:rgba(255,248,230,.98);border-radius:12px;padding:7px 9px}
+  #powerBar{height:12px;border-radius:999px;background:#d7d1bd;overflow:hidden}
+  #powerFill{height:100%;width:20%;background:linear-gradient(90deg,#6dbd5f,#edc24e,#dc6648)}
+  #powerText{text-align:center;font-size:12px;font-weight:900;margin-top:4px}
+  #tip{text-align:center;color:#eaf7ee;font-size:12px;font-weight:700;margin:6px 0 2px}
+  .scoregrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}.scorecell{background:#f0ead6;border-radius:10px;padding:7px;font-size:12px}.scorecell strong{display:block;font-size:18px}
+  @media (max-width:700px){
+    body{padding:0}
+    #gameShell{width:100%}
+    #stage{border-width:2px;border-radius:10px}
+    #hud{gap:3px;margin-bottom:4px}
+    .hudBox{padding:5px 3px;font-size:11px}
+  }
+  @media (max-width:700px) and (orientation:portrait){
+    canvas{aspect-ratio:16/15}
+  }
+  @media (orientation:landscape) and (max-height:650px){
+    body{padding:0}.hudBox{font-size:11px;padding:4px}.hudBox:nth-child(6){display:none}#stage{border-width:3px}
+    #controls{grid-template-columns:1fr 1.2fr;margin-top:4px;gap:5px}button{min-height:46px;font-size:14px}#hitBtn{font-size:17px}
+    #secondaryControls{display:none}#powerWrap{padding:5px}#tip{display:none}
+  }
+</style>
 </head>
+<body>
+<div id="gameShell">
+  <div id="hud">
+    <div class="hudBox" id="holeHud">Hole 1/9</div>
+    <div class="hudBox" id="parHud">Par 4</div>
+    <div class="hudBox" id="strokeHud">Strokes 0</div>
+    <div class="hudBox" id="scoreHud">Score E</div>
+    <div class="hudBox" id="dirHud">Goal ↑</div>
+    <div class="hudBox" id="ballHud">Ball Standard</div>
+  </div>
 
-<body>      <!--Everything in the body area is visible on the website  -->
-    <header  style="position: sticky; top: 0; width: 100%;">
-    <div class="nav-bar">
-        <a href="index.html">
-        <button class="button">Home</button></a>
-        <a href="bunny2.html">
-        <button class="button">Bunny Gallery</button></a>
-        <a href="bunny3.html">
-        <button class="button">About Bunny</button></a>
-        <a href="bunny4.html">
-        <button class="button">Shop</button></a>
+  <div id="stage">
+    <canvas id="game" width="960" height="640" aria-label="Side-view Bounce Golf course"></canvas>
+    <div id="message" aria-live="polite"></div>
+    <div id="overlay">
+      <div class="card" id="startCard">
+        <div style="font-size:50px">⛳</div>
+        <h1>Bounce Golf</h1>
+        <p>Side-view platform golf. Every round creates fresh islands, themes and ball types. Snow slides, sand slows you down, jungle turf grips, and volcanic rock gives harder rebounds.</p>
+        <div class="difficultyLabel">Choose difficulty</div>
+        <div class="difficultyGrid" id="difficultyGrid">
+          <button class="diffBtn" data-difficulty="easy">Easy</button>
+          <button class="diffBtn selected" data-difficulty="medium">Medium</button>
+          <button class="diffBtn" data-difficulty="hard">Hard</button>
+        </div>
+        <button id="startBtn">Play New 9-Hole Course</button>
+      </div>
+      <div class="card" id="ballCard" style="display:none">
+        <div style="font-size:42px">●</div>
+        <h2>Random Ball</h2>
+        <p id="ballHoleLabel">Hole 1 · the game gives you a random ball for this hole.</p>
+        <div class="ballGrid">
+          <button class="ballBtn" data-ball="standard"><span class="ballDot ball-standard"></span><strong>Standard</strong><small>Balanced flight, bounce and roll.</small></button>
+          <button class="ballBtn" data-ball="heavy"><span class="ballDot ball-heavy"></span><strong>Heavy</strong><small>Falls faster and barely bounces. Harder to climb.</small></button>
+          <button class="ballBtn" data-ball="bouncy"><span class="ballDot ball-bouncy"></span><strong>Bouncy</strong><small>Big rebounds for trick shots. Harder to control.</small></button>
+          <button class="ballBtn" data-ball="sticky"><span class="ballDot ball-sticky"></span><strong>Sticky</strong><small>Grips grass and stops quickly. Great for small islands.</small></button>
+        </div>
+      </div>
+      <div class="card victoryCard" id="holeWinCard" style="display:none">
+        <div class="victoryBurst">⛳✨</div>
+        <h2 class="victoryTitle" id="holeWinTitle">Hole Complete!</h2>
+        <div class="winResult" id="holeWinResult">Par!</div>
+        <p id="holeWinDetails">Nice shot.</p>
+      </div>
+      <div class="card" id="pauseCard" style="display:none">
+        <h2>Paused</h2>
+        <button id="continueBtn">Continue</button>
+        <button id="restartHoleBtn">Restart Hole</button>
+        <button id="titleBtn">Title Screen</button>
+      </div>
+      <div class="card victoryCard" id="endCard" style="display:none">
+        <div class="victoryBurst">🏆✨</div>
+        <h2 class="victoryTitle" id="endTitle">Victory!</h2>
+        <div class="finalScoreBanner" id="finalScoreBanner">Score E</div>
+        <p id="endSummary"></p>
+        <div id="scoreGrid" class="scoregrid"></div>
+        <div class="endActions">
+          <button id="againBtn">New Game</button>
+          <button id="endMenuBtn">Main Menu</button>
+        </div>
+      </div>
     </div>
-    </header>
-    <br>
-    <div>
- 
-    <a target="_blank">
-        <img class="container" src="images/bunny_webpage_banner.jpg" alt="Bunny Blue Home Page Banner"></a>
-    </div> 
+  </div>
 
-    <h1 class="bunnyblue">Actually, he's a Blue Lionhead </h1>
-    <p class="bunnypar"> Bunny Blue is the most famous Blue Lionheads with a growing social media presence - You'll find BB on Youtube and Instagram. You can watch the trailer for Bunny's Youtube channel just below. <br><br>
-    Learn about the Lionhead breed and what makes them one of a kind. They are one of the fluffiest rabbits and need a great deal of attention. <br><br>
-    Whether it is a t-shirt, wall art, a mug or anything else, check out our latest products. Buy yourself some unique Bunny Products and see some Bunny recommendations<br><br>
-    </p>
-    <div>
-        <p class="center2 bunnyblue2">Watch the Bunny Time trailer here</p>
-        <iframe class="center"src="https://www.youtube.com/embed/mPW4-nNFqi8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <p class="bunnyblue3"> See more videos on
-        </a>
-        <a href="bunny2.html"> Bunny Gallery
-        </p>
+  <div id="controls">
+    <div id="aimControls">
+      <button id="leftBtn">◀ AIM</button>
+      <button id="rightBtn">AIM ▶</button>
     </div>
+    <button id="hitBtn">HOLD TO HIT</button>
+    <div id="powerWrap"><div id="powerBar"><div id="powerFill"></div></div><div id="powerText">Power 20%</div></div>
+    <div id="secondaryControls"><button id="resetBtn">Reset Ball</button><button id="pauseBtn">Pause</button></div>
+  </div>
+  <div id="tip">Tap to aim, then hold HIT and release. Each hole starts with a random ball and its own ground physics. When your ball reaches the hole’s green, it switches to a normal white golf ball with consistent putting physics: putts go only left or right along the green. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
+</div>
+<script>
+(()=>{
+  const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+  // Portrait phones use a taller, almost-square course. Tablets/desktop stay wide.
+  const phonePortrait=window.matchMedia('(max-width:700px) and (orientation:portrait)').matches;
+  canvas.width=960;
+  canvas.height=phonePortrait?900:640;
+  const W=canvas.width,H=canvas.height;
+  const holeHud=document.getElementById('holeHud'),parHud=document.getElementById('parHud'),strokeHud=document.getElementById('strokeHud'),scoreHud=document.getElementById('scoreHud'),dirHud=document.getElementById('dirHud'),ballHud=document.getElementById('ballHud');
+  const message=document.getElementById('message'),overlay=document.getElementById('overlay');
+  const startCard=document.getElementById('startCard'),ballCard=document.getElementById('ballCard'),holeWinCard=document.getElementById('holeWinCard'),pauseCard=document.getElementById('pauseCard'),endCard=document.getElementById('endCard');
+  const startBtn=document.getElementById('startBtn'),againBtn=document.getElementById('againBtn'),endMenuBtn=document.getElementById('endMenuBtn'),continueBtn=document.getElementById('continueBtn'),restartHoleBtn=document.getElementById('restartHoleBtn'),titleBtn=document.getElementById('titleBtn');
+  const leftBtn=document.getElementById('leftBtn'),rightBtn=document.getElementById('rightBtn'),hitBtn=document.getElementById('hitBtn'),resetBtn=document.getElementById('resetBtn'),pauseBtn=document.getElementById('pauseBtn');
+  const powerFill=document.getElementById('powerFill'),powerText=document.getElementById('powerText'),endSummary=document.getElementById('endSummary'),endTitle=document.getElementById('endTitle'),finalScoreBanner=document.getElementById('finalScoreBanner'),scoreGrid=document.getElementById('scoreGrid'),ballHoleLabel=document.getElementById('ballHoleLabel'),holeWinTitle=document.getElementById('holeWinTitle'),holeWinResult=document.getElementById('holeWinResult'),holeWinDetails=document.getElementById('holeWinDetails');
+  const difficultyBtns=[...document.querySelectorAll('.diffBtn')];
+  const ballBtns=[...document.querySelectorAll('.ballBtn')];
 
-<!-- <div>
-    <br>
-    <a class="center2 bunnyblue3" href="https://www.instagram.com/p/CUXsjmMKaUN/?utm_source=ig_web_copy_link" target="_blank">
-    <img class="center2" src="images/bunny_sleeping.jpeg" alt="bunny sleeping"></a>
-    <p>Click the picture to see more Bunny Blue on Instagram</p>
+  const GRAVITY=620, BALL_R=10;
+  let holes=[];
 
-</div> -->
+  let holeIndex=0,strokes=0,totalScore=0,results=[],playing=false,paused=false;
+  let ball={x:0,y:0,vx:0,vy:0,moving:false,grounded:false,lost:false,sinking:false,holed:false,onGreen:false,sinkStart:0,sinkSurfaceY:0};
+  let angle=-Math.PI/4,power=20,charging=false,chargeStart=0,chargeRAF=null;
+  let lastTime=performance.now(),restTimer=0,lastSafe={x:0,y:0,onGreen:false};
+  let selectedDifficulty='medium';
+  let selectedBallType='standard',choosingBall=false,lossEffect=null;
 
-<!-- The alt tag describes the image -->
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  const randInt=(a,b)=>Math.floor(rand(a,b+1));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+
+  const difficultySettings={
+    easy:{count:[3,5],width:[155,225],gap:[32,62],jitterY:32,maxStep:122,height:[68,118],label:'Easy'},
+    medium:{count:[3,6],width:[125,205],gap:[45,88],jitterY:62,maxStep:150,height:[70,142],label:'Medium'},
+    hard:{count:[4,7],width:[96,170],gap:[58,108],jitterY:92,maxStep:182,height:[62,138],label:'Hard'}
+  };
+
+  const ballTypes={
+    standard:{label:'Standard',color:'#ffffff',stroke:'#c7d0cc',gravity:1,launch:1,grassBounce:1,wallBounce:1,landingGrip:1,rollDecay:.986,putt:1,cupSpeed:165},
+    heavy:{label:'Heavy',color:'#5f6670',stroke:'#3f454d',gravity:1.28,launch:.88,grassBounce:.45,wallBounce:.82,landingGrip:.96,rollDecay:.982,putt:.93,cupSpeed:150},
+    bouncy:{label:'Bouncy',color:'#ff8a2a',stroke:'#c75f0e',gravity:.90,launch:1.03,grassBounce:1.85,wallBounce:1.28,landingGrip:1,rollDecay:.989,putt:1.08,cupSpeed:138},
+    sticky:{label:'Sticky',color:'#62b84f',stroke:'#397c31',gravity:1,launch:.97,grassBounce:.12,wallBounce:.76,landingGrip:.68,rollDecay:.955,putt:.78,cupSpeed:190}
+  };
 
 
+  const themes={
+    classic:{label:'Classic',skyTop:'#8ee6eb',skyBottom:'#e5f4e3',cloud:'rgba(255,255,255,.86)',mountain1:'#a8c6c8',mountain2:'#91b2b3',soil1:'#a85b32',soil2:'rgba(190,105,55,.45)',soilShade:'rgba(100,49,31,.20)',crack:'rgba(92,49,31,.45)',grass1:'#3d8f2f',grass2:'#68b63f',tuft:'#2f7b2a',trunk:'#70452c',leaf1:'#4d8f2f',leaf2:'#73b83a',stem:'#39763b',petal1:'#ffd85a',petal2:'#a774df',center:'#f7b94b',hazardKind:'water',hazardDepth:60,hazard1:'#2f84db',hazard2:'#60c9f7',hazardFoam:'rgba(255,255,255,.8)',lossText:'Splash! Ball lost — stroke counts',effectColor:'#bdefff',surface:'Normal grass',groundBounce:1,landingGrip:1,rollDecay:1,puttSpeed:1,wallBounce:1,cupCatch:1},
+    snowy:{label:'Snowy',skyTop:'#b8dbff',skyBottom:'#eef7ff',cloud:'rgba(255,255,255,.8)',mountain1:'#d6e5ef',mountain2:'#b6c9d6',soil1:'#7f8c97',soil2:'rgba(195,210,220,.35)',soilShade:'rgba(85,104,121,.22)',crack:'rgba(96,108,121,.28)',grass1:'#eef4f8',grass2:'#ffffff',tuft:'#dce9f2',trunk:'#6a5b50',leaf1:'#52734f',leaf2:'#86a98d',stem:'#7ca19f',petal1:'#d7f2ff',petal2:'#ffffff',center:'#f2cc73',hazardKind:'icewater',hazardDepth:62,hazard1:'#4eb7f1',hazard2:'#baf0ff',hazardFoam:'rgba(255,255,255,.9)',lossText:'Splosh! Lost in icy water — stroke counts',effectColor:'#e6fbff',surface:'Slippery snow',groundBounce:.92,landingGrip:.99,rollDecay:1.008,puttSpeed:1.08,wallBounce:1.04,cupCatch:1.08},
+    desert:{label:'Desert',skyTop:'#ffd194',skyBottom:'#ffe9be',cloud:'rgba(255,244,210,.6)',mountain1:'#d9a06b',mountain2:'#b97645',soil1:'#b8763d',soil2:'rgba(255,204,130,.22)',soilShade:'rgba(112,67,29,.18)',crack:'rgba(120,70,32,.35)',grass1:'#ddb45d',grass2:'#f1d387',tuft:'#b79037',trunk:'#8f6431',leaf1:'#73a24c',leaf2:'#9dcc68',stem:'#8a7a2f',petal1:'#ffdd79',petal2:'#ff9d57',center:'#fff2b5',hazardKind:'sand',hazardDepth:58,hazard1:'#d6b04f',hazard2:'#f0d57c',hazardFoam:'rgba(255,243,205,.6)',lossText:'Buried in sand — stroke counts',effectColor:'#f5e4ae',surface:'Soft sand',groundBounce:.48,landingGrip:.70,rollDecay:.965,puttSpeed:.76,wallBounce:.88,cupCatch:1.10},
+    jungle:{label:'Jungle',skyTop:'#6ad0c8',skyBottom:'#d9f6db',cloud:'rgba(255,255,255,.65)',mountain1:'#6eb39a',mountain2:'#3e7a63',soil1:'#755233',soil2:'rgba(117,82,51,.38)',soilShade:'rgba(54,33,18,.22)',crack:'rgba(64,40,20,.38)',grass1:'#2b994c',grass2:'#59d062',tuft:'#1e7d35',trunk:'#5f3b1f',leaf1:'#1f8740',leaf2:'#57b760',stem:'#2d8d41',petal1:'#ffdb57',petal2:'#ff5f9d',center:'#fff3a0',hazardKind:'swamp',hazardDepth:60,hazard1:'#355f2a',hazard2:'#68a646',hazardFoam:'rgba(201,232,128,.45)',lossText:'Plop! Swallowed by the swamp — stroke counts',effectColor:'#c5ef7f',surface:'Grippy jungle turf',groundBounce:.68,landingGrip:.84,rollDecay:.982,puttSpeed:.88,wallBounce:.92,cupCatch:1.06},
+    autumn:{label:'Autumn',skyTop:'#ffd5a3',skyBottom:'#fff0cc',cloud:'rgba(255,250,235,.7)',mountain1:'#d7b08f',mountain2:'#b98661',soil1:'#8d5a39',soil2:'rgba(171,116,73,.32)',soilShade:'rgba(86,52,31,.18)',crack:'rgba(96,58,37,.38)',grass1:'#bf7d2e',grass2:'#e3a445',tuft:'#9c5f19',trunk:'#6b432a',leaf1:'#cb6d27',leaf2:'#e5b23b',stem:'#7a5f2f',petal1:'#ffdd81',petal2:'#d36a5a',center:'#fff0ba',hazardKind:'river',hazardDepth:60,hazard1:'#547fc9',hazard2:'#7ec6ef',hazardFoam:'rgba(255,255,255,.7)',lossText:'Splash! Into the river — stroke counts',effectColor:'#dbf5ff',surface:'Leafy turf',groundBounce:.86,landingGrip:.91,rollDecay:.992,puttSpeed:.94,wallBounce:.97,cupCatch:1.03},
+    volcano:{label:'Volcanic',skyTop:'#40354a',skyBottom:'#1f1a22',cloud:'rgba(255,180,130,.18)',mountain1:'#64525e',mountain2:'#3c3238',soil1:'#54484e',soil2:'rgba(120,98,104,.24)',soilShade:'rgba(20,17,19,.28)',crack:'rgba(255,120,60,.22)',grass1:'#7b7274',grass2:'#9f9498',tuft:'#685f63',trunk:'#4d3831',leaf1:'#6b4f3d',leaf2:'#8c6a53',stem:'#8a5a35',petal1:'#ff8a52',petal2:'#f2d15b',center:'#ffe8a0',hazardKind:'lava',hazardDepth:64,hazard1:'#ff5a1f',hazard2:'#ffb027',hazardFoam:'rgba(255,214,125,.55)',lossText:'Burned up in lava — stroke counts',effectColor:'#ffd36b',surface:'Hard volcanic rock',groundBounce:1.28,landingGrip:1.02,rollDecay:1.002,puttSpeed:1.04,wallBounce:1.12,cupCatch:.94}
+  };
+  const themeKeys=Object.keys(themes);
+  const ballKeys=Object.keys(ballTypes);
+  const shuffle=a=>{const arr=[...a];for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;};
+  const randomBallKey=()=>ballKeys[randInt(0,ballKeys.length-1)];
+  const currentTheme=(h=currentHole())=>themes[h?.theme||'classic'];
+
+  const backdropChoices={
+    classic:['hills','coast','city','mountains','forest'],
+    snowy:['snowfield','forest','mountains','frozenLake'],
+    desert:['dunes','mesas','openDesert'],
+    jungle:['canopy','forest','hills'],
+    autumn:['forest','hills','lake','city'],
+    volcano:['volcano','darkHills','ashPlain']
+  };
+  const layoutTypes=['climb','descend','flat','valley','peak','zigzag','rolling'];
+  const randomBackdrop=themeKey=>{
+    const a=backdropChoices[themeKey]||['hills'];
+    return a[randInt(0,a.length-1)];
+  };
+  // Every cup platform is a true putting green: consistent grass physics in all worlds.
+  const greenSurface={surface:'Putting green',groundBounce:.20,landingGrip:1,rollDecay:1.004,puttSpeed:1,wallBounce:1,cupCatch:1.55};
+  const onGreenPlatform=()=>{
+    if(!ball.onGreen)return false;
+    const p=cupPlatform();
+    return !!p&&ball.x>=p.x-BALL_R&&ball.x<=p.x+p.w+BALL_R&&Math.abs(ball.y+BALL_R-p.y)<15;
+  };
+  const surfacePhysics=()=>onGreenPlatform()?greenSurface:currentTheme();
+  function activatePuttingGreen(){
+    if(ball.onGreen)return;
+    ball.onGreen=true;
+    selectedBallType='standard'; // The random ball is used until the putting green.
+    showMessage('Putting green — normal ball!',950);
+    updateHud();
+  }
+
+  function generateHole(idx,difficulty,themeKey,layoutType){
+    const cfg=difficultySettings[difficulty];
+    const count=randInt(cfg.count[0],cfg.count[1]);
+    const dir=Math.random()<.5?1:-1;
+    const margin=24,targetWidth=W-margin*2;
+
+    // Build varied widths. At least some holes contain a noticeably long landing island.
+    let widths=Array.from({length:count},(_,i)=>rand(cfg.width[0],cfg.width[1])*(i===0||i===count-1?1.08:1));
+    if(Math.random()<.78){
+      const longIndex=randInt(0,count-1);
+      widths[longIndex]*=rand(1.35,1.85);
+      if(count>=5&&Math.random()<.28){
+        let second=randInt(0,count-1);if(second===longIndex)second=(second+2)%count;
+        widths[second]*=rand(1.20,1.55);
+      }
+    }
+    let gaps=Array.from({length:count-1},()=>rand(cfg.gap[0],cfg.gap[1]));
+    let total=widths.reduce((a,b)=>a+b,0)+gaps.reduce((a,b)=>a+b,0);
+    if(total>targetWidth){
+      // Shrink gaps first, then scale the full layout only if needed.
+      gaps=gaps.map(g=>Math.max(24,g*.72));
+      total=widths.reduce((a,b)=>a+b,0)+gaps.reduce((a,b)=>a+b,0);
+      if(total>targetWidth){
+        const scale=targetWidth/total;
+        widths=widths.map(v=>Math.max(82,v*scale));
+        gaps=gaps.map(v=>Math.max(20,v*scale));
+        total=widths.reduce((a,b)=>a+b,0)+gaps.reduce((a,b)=>a+b,0);
+      }
+    }
+    const spare=Math.max(0,targetWidth-total),leftOffset=margin+spare/2;
+    const xs=[];let cursor=leftOffset;
+    for(let i=0;i<count;i++){xs.push(cursor);cursor+=widths[i]+(gaps[i]||0);}
+
+    const hazardDepth=(themes[themeKey]?.hazardDepth||60);
+    const topY=135,bottomY=Math.max(310,H-hazardDepth-82);
+    const high=()=>rand(topY,Math.min(topY+155,bottomY-120));
+    const mid=()=>rand(topY+85,Math.max(topY+115,bottomY-85));
+    const low=()=>rand(Math.max(topY+170,bottomY-135),bottomY);
+    let startY,endY;
+
+    if(layoutType==='climb'){startY=low();endY=high();}
+    else if(layoutType==='descend'){startY=high();endY=low();}
+    else if(layoutType==='flat'){startY=mid();endY=clamp(startY+rand(-55,55),topY,bottomY);}
+    else if(layoutType==='valley'){startY=high();endY=high();}
+    else if(layoutType==='peak'){startY=low();endY=low();}
+    else if(layoutType==='zigzag'){startY=rand(topY+30,bottomY-30);endY=rand(topY+30,bottomY-30);}
+    else{startY=rand(topY,bottomY);endY=rand(topY,bottomY);}
+
+    const path=[];let previousY=startY;
+    for(let i=0;i<count;i++){
+      const u=i/(count-1);
+      let y;
+      if(i===0)y=startY;
+      else if(i===count-1)y=endY;
+      else if(layoutType==='valley'){
+        // Coordinate y grows downward: a valley dips lower in the middle.
+        y=lerp(startY,endY,u)+Math.sin(Math.PI*u)*rand(95,Math.min(210,cfg.maxStep*1.25));
+      }else if(layoutType==='peak'){
+        y=lerp(startY,endY,u)-Math.sin(Math.PI*u)*rand(95,Math.min(210,cfg.maxStep*1.25));
+      }else if(layoutType==='zigzag'){
+        const sign=i%2?1:-1;
+        y=mid()+sign*rand(55,Math.min(145,cfg.jitterY+70));
+      }else if(layoutType==='rolling'){
+        y=lerp(startY,endY,u)+Math.sin(u*Math.PI*2+idx)*rand(35,95)+rand(-25,25);
+      }else{
+        y=lerp(startY,endY,u)+rand(-cfg.jitterY,cfg.jitterY);
+      }
+      if(i>0)y=clamp(y,previousY-cfg.maxStep,previousY+cfg.maxStep);
+      y=clamp(y,topY,bottomY);previousY=y;
+      const sortedIndex=dir===1?i:count-1-i;
+      const p={x:xs[sortedIndex],y,w:widths[sortedIndex],h:rand(cfg.height[0],cfg.height[1]),flowers:Math.random()<.72};
+      if(Math.random()<(difficulty==='hard'?.34:.55))p.trees=[rand(.20,.80)];
+      path.push(p);
+    }
+
+    const startPlatform=path[0],cupPlatform=path[path.length-1];
+    const startX=startPlatform.x+startPlatform.w*(dir===1?.27:.73);
+    const cupX=cupPlatform.x+cupPlatform.w*(dir===1?.72:.28);
+    const par=Math.max(3,count+(difficulty==='easy'?0:1));
+    return {
+      par,theme:themeKey,backdrop:randomBackdrop(themeKey),layout:layoutType,ballType:randomBallKey(),
+      start:{x:startX,y:startPlatform.y},cup:{x:cupX,y:cupPlatform.y},platforms:path
+    };
+  }
+
+  function generateCourse(difficulty){
+    let themeOrder=[];while(themeOrder.length<9)themeOrder=themeOrder.concat(shuffle(themeKeys));
+    let layoutOrder=[];while(layoutOrder.length<9)layoutOrder=layoutOrder.concat(shuffle(layoutTypes));
+    themeOrder=themeOrder.slice(0,9);layoutOrder=layoutOrder.slice(0,9);
+    return Array.from({length:9},(_,i)=>generateHole(i,difficulty,themeOrder[i],layoutOrder[i]));
+  }
+
+  function setDifficulty(difficulty){
+    selectedDifficulty=difficulty;
+    difficultyBtns.forEach(b=>b.classList.toggle('selected',b.dataset.difficulty===difficulty));
+  }
+
+  const currentHole=()=>holes[holeIndex];
+  const currentBall=()=>ballTypes[selectedBallType];
+  const speed=()=>Math.hypot(ball.vx,ball.vy);
+  const scoreText=n=>n===0?'E':n>0?'+'+n:String(n);
+  function showMessage(t,ms=1000){message.textContent=t;message.classList.add('show');clearTimeout(showMessage.t);showMessage.t=setTimeout(()=>message.classList.remove('show'),ms)}
+
+  function loadHole(idx,resetStrokes=true){
+    holeIndex=idx; if(resetStrokes)strokes=0;
+    const h=currentHole();
+    selectedBallType=h.ballType||randomBallKey();
+    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;
+    lastSafe={x:ball.x,y:ball.y,onGreen:false};restTimer=0;lossEffect=null;
+    const dx=h.cup.x-ball.x,dy=(h.cup.y-16)-ball.y;angle=Math.atan2(dy,dx);
+    power=20;updatePower();updateHud();
+  }
+
+  function updateHud(){
+    const h=currentHole();
+    holeHud.textContent=`Hole ${holeIndex+1}/9`;
+    parHud.textContent=`Par ${h.par} · ${difficultySettings[selectedDifficulty].label}`;
+    strokeHud.textContent=`Strokes ${strokes}`;
+    scoreHud.textContent=`Score ${scoreText(totalScore)}`;
+    dirHud.textContent=h.cup.y<ball.y?'Goal ↑':h.cup.y>ball.y?'Goal ↓':'Goal →';
+    ballHud.textContent=ball.onGreen?`Ball Standard · Green`:`Ball ${currentBall().label} · ${currentTheme().label}`;
+    dirHud.title=onGreenPlatform()?'Normal putting green':currentTheme().surface;
+    updateControlMode();
+  }
+
+  function updatePower(){powerFill.style.width=power+'%';powerText.textContent=`Power ${Math.round(power)}%`}
+
+  function drawBackground(){
+    const th=currentTheme(),style=currentHole().backdrop||'hills';
+    const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,th.skyTop);g.addColorStop(.68,th.skyBottom);g.addColorStop(1,th.skyBottom);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+    // Light cloud layer for most daytime scenes.
+    if(!['volcano','darkHills','ashPlain'].includes(style)){
+      ctx.fillStyle=th.cloud;
+      for(const c of [[115,86,1.05],[475,68,.78],[805,108,.95]]){ctx.beginPath();ctx.arc(c[0],c[1],27*c[2],0,Math.PI*2);ctx.arc(c[0]+31*c[2],c[1]+5,23*c[2],0,Math.PI*2);ctx.arc(c[0]-27*c[2],c[1]+8,19*c[2],0,Math.PI*2);ctx.fill()}
+    }
+
+    if(style==='mountains'){
+      ctx.fillStyle=th.mountain1;ctx.beginPath();ctx.moveTo(0,H*.72);ctx.lineTo(135,H*.52);ctx.lineTo(245,H*.66);ctx.lineTo(390,H*.47);ctx.lineTo(535,H*.68);ctx.lineTo(690,H*.49);ctx.lineTo(835,H*.66);ctx.lineTo(W,H*.54);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+      ctx.fillStyle=th.mountain2;ctx.beginPath();ctx.moveTo(0,H*.82);ctx.lineTo(145,H*.64);ctx.lineTo(285,H*.78);ctx.lineTo(460,H*.62);ctx.lineTo(620,H*.80);ctx.lineTo(805,H*.64);ctx.lineTo(W,H*.77);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+      if(currentTheme().label==='Snowy'){ctx.fillStyle='rgba(255,255,255,.9)';for(const p of [[135,H*.52],[390,H*.47],[690,H*.49]]){ctx.beginPath();ctx.moveTo(p[0]-30,p[1]+28);ctx.lineTo(p[0],p[1]-4);ctx.lineTo(p[0]+31,p[1]+28);ctx.closePath();ctx.fill();}}
+    }else if(style==='hills'||style==='darkHills'){
+      ctx.fillStyle=style==='darkHills'?'#352e34':th.mountain1;ctx.beginPath();ctx.moveTo(0,H*.72);ctx.bezierCurveTo(W*.18,H*.54,W*.30,H*.82,W*.48,H*.66);ctx.bezierCurveTo(W*.64,H*.50,W*.78,H*.80,W,H*.61);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+      ctx.fillStyle=style==='darkHills'?'#272228':th.mountain2;ctx.beginPath();ctx.moveTo(0,H*.82);ctx.bezierCurveTo(W*.24,H*.67,W*.38,H*.88,W*.58,H*.72);ctx.bezierCurveTo(W*.73,H*.61,W*.85,H*.85,W,H*.73);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+    }else if(style==='forest'||style==='snowfield'){
+      ctx.fillStyle=th.mountain1;ctx.fillRect(0,H*.70,W,H*.30);
+      const snowy=style==='snowfield'||th.label==='Snowy';
+      for(let x=20;x<W;x+=48){
+        const base=H*.71+((x*7)%38);const h=55+((x*13)%70);
+        ctx.fillStyle=snowy?'#78969a':th.mountain2;ctx.fillRect(x-3,base-h*.22,6,h*.22);
+        for(let j=0;j<3;j++){ctx.beginPath();ctx.moveTo(x,base-h+j*18);ctx.lineTo(x-18-j*3,base-h+35+j*18);ctx.lineTo(x+18+j*3,base-h+35+j*18);ctx.closePath();ctx.fill();}
+      }
+      if(snowy){ctx.fillStyle='rgba(255,255,255,.82)';ctx.fillRect(0,H*.72,W,H*.28)}
+    }else if(style==='coast'||style==='lake'||style==='frozenLake'){
+      const horizon=H*.63;ctx.fillStyle=style==='frozenLake'?'#d8edf4':th.mountain1;ctx.fillRect(0,horizon,W,H-horizon);
+      ctx.fillStyle=style==='frozenLake'?'rgba(255,255,255,.7)':'rgba(255,255,255,.22)';for(let y=horizon+14;y<H*.86;y+=18)ctx.fillRect((y*5)%90,y,W*.24,3);
+      ctx.fillStyle=th.mountain2;ctx.beginPath();ctx.moveTo(0,horizon+12);ctx.lineTo(120,horizon-22);ctx.lineTo(235,horizon+10);ctx.lineTo(350,horizon-12);ctx.lineTo(465,horizon+13);ctx.lineTo(465,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+      if(style==='coast'){ctx.fillStyle='#f3f0dc';ctx.fillRect(W*.78,horizon-70,9,70);ctx.fillStyle='#d94e48';ctx.beginPath();ctx.moveTo(W*.785,horizon-84);ctx.lineTo(W*.765,horizon-62);ctx.lineTo(W*.805,horizon-62);ctx.closePath();ctx.fill();}
+    }else if(style==='city'){
+      const base=H*.76;ctx.fillStyle=th.mountain2;
+      for(let x=0;x<W;x+=46){const bh=45+((x*17)%105);ctx.fillRect(x,base-bh,34,bh);if(x%92===0)ctx.fillRect(x+10,base-bh-24,5,24);}
+      ctx.fillStyle='rgba(255,245,180,.5)';for(let x=10;x<W;x+=92)for(let y=base-58;y<base-12;y+=19)ctx.fillRect(x,y,5,7);
+    }else if(style==='dunes'||style==='openDesert'){
+      ctx.fillStyle='#e4bd72';ctx.beginPath();ctx.moveTo(0,H*.67);ctx.bezierCurveTo(W*.18,H*.58,W*.32,H*.77,W*.50,H*.66);ctx.bezierCurveTo(W*.68,H*.55,W*.80,H*.74,W,H*.62);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#c99353';ctx.beginPath();ctx.moveTo(0,H*.80);ctx.bezierCurveTo(W*.22,H*.68,W*.36,H*.86,W*.55,H*.75);ctx.bezierCurveTo(W*.72,H*.65,W*.85,H*.84,W,H*.73);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+    }else if(style==='mesas'){
+      ctx.fillStyle='#c38354';for(const m of [[60,.63,150],[300,.70,110],[570,.58,170],[820,.68,120]]){const x=m[0],y=H*m[1],w=m[2];ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w*.18,y-55);ctx.lineTo(x+w*.82,y-55);ctx.lineTo(x+w,y);ctx.lineTo(x+w,H);ctx.lineTo(x,H);ctx.closePath();ctx.fill();}
+    }else if(style==='canopy'){
+      ctx.fillStyle='#2f7055';ctx.fillRect(0,H*.72,W,H*.28);for(let x=0;x<W;x+=34){ctx.fillStyle=x%68===0?'#347c55':'#285f46';ctx.beginPath();ctx.arc(x,H*.70-((x*11)%55),42,0,Math.PI*2);ctx.fill();}
+      ctx.strokeStyle='rgba(33,84,52,.55)';ctx.lineWidth=6;for(let x=90;x<W;x+=190){ctx.beginPath();ctx.moveTo(x,0);ctx.bezierCurveTo(x+80,H*.22,x-50,H*.40,x+30,H*.58);ctx.stroke();}
+    }else if(style==='volcano'){
+      ctx.fillStyle='#5d4a50';ctx.beginPath();ctx.moveTo(W*.18,H*.78);ctx.lineTo(W*.48,H*.40);ctx.lineTo(W*.56,H*.40);ctx.lineTo(W*.84,H*.78);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#ed6a35';ctx.beginPath();ctx.moveTo(W*.48,H*.40);ctx.lineTo(W*.52,H*.48);ctx.lineTo(W*.56,H*.40);ctx.closePath();ctx.fill();
+      ctx.fillStyle='rgba(120,105,110,.32)';for(const c of [[W*.52,H*.31,34],[W*.49,H*.24,27],[W*.55,H*.18,22]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}
+    }else if(style==='ashPlain'){
+      ctx.fillStyle='#51484c';ctx.fillRect(0,H*.67,W,H*.33);ctx.fillStyle='rgba(255,115,60,.25)';for(let x=0;x<W;x+=110)ctx.fillRect(x,H*.69+((x*9)%90),70,4);
+    }
+
+    drawHazard(th);
+  }
+
+  function drawHazard(th){
+    const top=H-th.hazardDepth;
+    const g=ctx.createLinearGradient(0,top,0,H);g.addColorStop(0,th.hazard2);g.addColorStop(1,th.hazard1);ctx.fillStyle=g;ctx.fillRect(0,top,W,th.hazardDepth);
+    ctx.fillStyle=th.hazardFoam;
+    const n=performance.now()/1000;
+    for(let x=-40;x<=W+40;x+=38){
+      const y=top+5+Math.sin(n*2.2+x*.03)*2.5;
+      if(th.hazardKind==='lava'){ctx.beginPath();ctx.arc(x,y+6,8+Math.sin(n*3+x*.02)*2,0,Math.PI*2);ctx.fill();}
+      else if(th.hazardKind==='sand'){ctx.fillRect(x,top+1+Math.sin(n*2+x*.05)*2,24,4);}
+      else if(th.hazardKind==='swamp'){ctx.beginPath();ctx.ellipse(x,y+7,10,4,0,0,Math.PI*2);ctx.fill();}
+      else{ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.arc(x+8,y+2,5,0,Math.PI*2);ctx.fill();}
+    }
+  }
+
+  function drawLossEffect(){
+    if(!lossEffect)return;
+    const t=(performance.now()-lossEffect.start)/700;
+    if(t>=1){lossEffect=null;return;}
+    const p=1-t;
+    ctx.save();ctx.globalAlpha=Math.max(.05,p);ctx.fillStyle=lossEffect.color;ctx.strokeStyle=lossEffect.color;
+    if(lossEffect.kind==='lava'){
+      for(let i=0;i<7;i++){const dx=(i-3)*9;ctx.beginPath();ctx.arc(lossEffect.x+dx*p*.4,lossEffect.y-22*t-Math.abs(i-3)*3*t,4+p*10*(1-Math.abs(i-3)/4),0,Math.PI*2);ctx.fill();}
+    }else if(lossEffect.kind==='sand'){
+      for(let i=0;i<9;i++){const dx=(i-4)*10;ctx.beginPath();ctx.arc(lossEffect.x+dx*.7,lossEffect.y-8*t-(i%2)*5,3+p*6,0,Math.PI*2);ctx.fill();}
+    }else{
+      for(let i=0;i<8;i++){const ang=(-Math.PI*.9)+(i/7)*Math.PI*1.8;ctx.beginPath();ctx.arc(lossEffect.x+Math.cos(ang)*28*t,lossEffect.y-Math.sin(ang)*14*p,3+p*6,0,Math.PI*2);ctx.fill();}
+    }
+    ctx.restore();
+  }
+
+  function roundedRectPath(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+  }
+
+  function drawTree(x,y,s=1){
+    const th=currentTheme();
+    ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+    ctx.fillStyle=th.trunk;roundedRectPath(-8,-55,16,58,6);ctx.fill();
+    ctx.fillStyle=th.leaf1;for(const c of [[-20,-62,23],[4,-76,27],[25,-60,21],[-4,-50,25]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle=th.leaf2;for(const c of [[-23,-70,13],[7,-86,14],[28,-69,11],[-3,-58,12]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}
+    if(th.label==='Snowy'){ctx.fillStyle='rgba(255,255,255,.9)';for(const c of [[-15,-66,10],[9,-78,10],[21,-60,8],[-4,-52,9]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}}
+    ctx.restore();
+  }
+
+  function drawFlower(x,y,phase=0){
+    const th=currentTheme();
+    ctx.strokeStyle=th.stem;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-10);ctx.stroke();
+    ctx.fillStyle=phase%2?th.petal1:th.petal2;for(let a=0;a<5;a++){ctx.beginPath();ctx.arc(x+Math.cos(a*1.256)*4,y-12+Math.sin(a*1.256)*4,2.7,0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle=th.center;ctx.beginPath();ctx.arc(x,y-12,2.4,0,Math.PI*2);ctx.fill();
+  }
+
+  function drawPlatform(p){
+    const th=currentTheme();
+    const r=Math.min(20,p.w*.08,p.h*.16);
+    ctx.fillStyle=th.soil1;roundedRectPath(p.x,p.y,p.w,p.h,r);ctx.fill();
+    const soil=ctx.createLinearGradient(p.x,p.y,p.x+p.w,p.y+p.h);soil.addColorStop(0,th.soil2);soil.addColorStop(1,th.soilShade);ctx.fillStyle=soil;roundedRectPath(p.x+4,p.y+8,p.w-8,Math.max(16,p.h-12),Math.max(6,r-4));ctx.fill();
+
+    const marks=Math.max(2,Math.floor(p.w/70));
+    for(let i=0;i<marks;i++){
+      const mx=p.x+22+((i*67+p.x*0.17)%Math.max(28,p.w-44));
+      const my=p.y+30+((i*43+p.y*0.11)%Math.max(20,p.h-48));
+      ctx.strokeStyle=th.crack;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx+7,my+5);ctx.lineTo(mx+3,my+13);ctx.stroke();
+    }
+
+    const isPuttingGreen=p===cupPlatform();
+    ctx.fillStyle=isPuttingGreen?'#297e49':th.grass1;roundedRectPath(p.x-3,p.y-5,p.w+6,18,9);ctx.fill();
+    ctx.fillStyle=isPuttingGreen?'#78d68a':th.grass2;roundedRectPath(p.x,p.y-7,p.w,10,6);ctx.fill();
+    ctx.fillStyle=isPuttingGreen?'#266f3c':th.tuft;
+    for(let gx=p.x+5;gx<p.x+p.w-4;gx+=18){
+      const drop=5+(((gx+p.y)|0)%9);ctx.beginPath();ctx.moveTo(gx,p.y+7);ctx.lineTo(gx+5,p.y+7+drop);ctx.lineTo(gx+10,p.y+7);ctx.closePath();ctx.fill();
+    }
+
+    if(p.trees){for(const f of p.trees)drawTree(p.x+p.w*f,p.y-5, p.w>220?.9:.72)}
+    if(p.flowers){
+      const count=Math.max(2,Math.min(6,Math.floor(p.w/55)));
+      for(let i=0;i<count;i++)drawFlower(p.x+18+i*(p.w-36)/Math.max(1,count-1),p.y-3,i+Math.floor(p.x));
+    }
+  }
+
+  function cupSurfaceY(h=currentHole()){
+    const candidates=h.platforms.filter(p=>h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
+    if(!candidates.length)return h.cup.y;
+    let best=candidates[0],bestDist=Math.abs(best.y-h.cup.y);
+    for(const p of candidates){const d=Math.abs(p.y-h.cup.y);if(d<bestDist){best=p;bestDist=d;}}
+    return best.y;
+  }
+
+  function cupPlatform(h=currentHole()){
+    const candidates=h.platforms.filter(p=>h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
+    if(!candidates.length)return null;
+    let best=candidates[0],bestDist=Math.abs(best.y-h.cup.y);
+    for(const p of candidates){const d=Math.abs(p.y-h.cup.y);if(d<bestDist){best=p;bestDist=d;}}
+    return best;
+  }
+
+  function puttingMode(){
+    if(ball.moving||ball.sinking||ball.lost)return false;
+    const p=cupPlatform();
+    if(!p)return false;
+    const onTop=Math.abs((ball.y+BALL_R)-p.y)<12;
+    const overPlatform=ball.x>=p.x-BALL_R&&ball.x<=p.x+p.w+BALL_R;
+    return onTop&&overPlatform;
+  }
+
+  function updateControlMode(){
+    const putting=puttingMode();
+    leftBtn.textContent=putting?'PUTT ←':'◀ AIM';
+    rightBtn.textContent=putting?'PUTT →':'AIM ▶';
+    hitBtn.textContent=putting?'HOLD TO PUTT':'HOLD TO HIT';
+    if(putting){
+      angle=ball.x>currentHole().cup.x?Math.PI:0;
+      dirHud.textContent=ball.x>currentHole().cup.x?'Putt ←':'Putt →';
+    }
+  }
+
+  function drawCup(){
+    const h=currentHole(),x=h.cup.x,y=cupSurfaceY(h);
+    // The cup is cut into the grass surface, not floating above it.
+    ctx.save();
+    ctx.fillStyle='#151515';ctx.beginPath();ctx.ellipse(x,y-1,15,5,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#f6f2df';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y-2);ctx.lineTo(x,y-70);ctx.stroke();
+    ctx.fillStyle='#e84d4d';ctx.beginPath();ctx.moveTo(x,y-70);ctx.lineTo(x+35,y-58);ctx.lineTo(x,y-47);ctx.closePath();ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBall(){
+    if(ball.lost||ball.holed)return;
+    let drawY=ball.y,r=BALL_R,alpha=1;
+    if(ball.sinking){
+      const t=clamp((performance.now()-ball.sinkStart)/430,0,1);
+      drawY=ball.y+t*15;
+      r=BALL_R*(1-t*.92);
+      alpha=1-t*.8;
+    }
+    ctx.save();ctx.globalAlpha=alpha;
+    const bt=currentBall();ctx.fillStyle=bt.color;ctx.strokeStyle=bt.stroke;ctx.lineWidth=2;ctx.beginPath();ctx.arc(ball.x,drawY,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,.15)';for(const a of [0,.9,1.8,2.7,3.6,4.5,5.4]){ctx.beginPath();ctx.arc(ball.x+Math.cos(a)*r*.5,drawY+Math.sin(a)*r*.5,Math.max(.6,r*.13),0,Math.PI*2);ctx.fill()}
+    ctx.restore();
+  }
+
+  function drawAim(){
+    if(ball.moving||ball.sinking||ball.lost||ball.holed||!playing||paused)return;
+    const len=70+power*.65,ex=ball.x+Math.cos(angle)*len,ey=ball.y+Math.sin(angle)*len;
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=4;ctx.setLineDash([9,8]);ctx.beginPath();ctx.moveTo(ball.x,ball.y);ctx.lineTo(ex,ey);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-Math.cos(angle-.55)*15,ey-Math.sin(angle-.55)*15);ctx.lineTo(ex-Math.cos(angle+.55)*15,ey-Math.sin(angle+.55)*15);ctx.closePath();ctx.fill();ctx.restore();
+  }
+
+  function draw(){
+    drawBackground();
+    ctx.strokeStyle='#e8dab0';ctx.lineWidth=10;ctx.strokeRect(5,5,W-10,H-10);
+    for(const p of currentHole().platforms)drawPlatform(p);
+    drawCup();drawAim();drawBall();drawLossEffect();
+  }
+
+  function circleRectCollision(p){
+    const nx=clamp(ball.x,p.x,p.x+p.w),ny=clamp(ball.y,p.y,p.y+p.h),dx=ball.x-nx,dy=ball.y-ny;
+    return dx*dx+dy*dy<BALL_R*BALL_R?{nx,ny,dx,dy}:null;
+  }
+
+  function resolvePlatform(p,prevX,prevY){
+    const hit=circleRectCollision(p);if(!hit)return false;
+    const wasAbove=prevY+BALL_R<=p.y+2,wasBelow=prevY-BALL_R>=p.y+p.h-2,wasLeft=prevX+BALL_R<=p.x+2,wasRight=prevX-BALL_R>=p.x+p.w-2;
+    if(p===cupPlatform()&&(wasAbove||(ball.y<p.y&&ball.vy>=0)))activatePuttingGreen();
+    const bt=currentBall(),sf=surfacePhysics();
+    const groundBounce=bt.grassBounce*sf.groundBounce;
+    const landingGrip=bt.landingGrip*sf.landingGrip;
+    const wallBounce=bt.wallBounce*sf.wallBounce;
+    if(wasAbove){
+      const impact=Math.abs(ball.vy);
+      ball.y=p.y-BALL_R;
+      if(impact>300)ball.vy=-impact*.20*groundBounce;
+      else if(impact>185)ball.vy=-impact*.11*groundBounce;
+      else ball.vy=0;
+      if(Math.abs(ball.vy)<18)ball.vy=0;
+      ball.vx*=(impact>240?.91:.96)*landingGrip;
+      ball.grounded=ball.vy===0;
+    }
+    else if(wasBelow){ball.y=p.y+p.h+BALL_R;ball.vy=Math.abs(ball.vy)*.38*wallBounce;ball.vx*=.96;}
+    else if(wasLeft){ball.x=p.x-BALL_R;ball.vx=-Math.abs(ball.vx)*.56*wallBounce;ball.vy*=.97;}
+    else if(wasRight){ball.x=p.x+p.w+BALL_R;ball.vx=Math.abs(ball.vx)*.56*wallBounce;ball.vy*=.97;}
+    else{
+      const penX=Math.min(Math.abs(ball.x-(p.x-BALL_R)),Math.abs(ball.x-(p.x+p.w+BALL_R)));
+      const penY=Math.min(Math.abs(ball.y-(p.y-BALL_R)),Math.abs(ball.y-(p.y+p.h+BALL_R)));
+      if(penY<penX){
+        if(ball.y<p.y){
+          const impact=Math.abs(ball.vy);ball.y=p.y-BALL_R;
+          ball.vy=impact>260?-impact*.16*groundBounce:0;
+          if(Math.abs(ball.vy)<18)ball.vy=0;
+          ball.vx*=.95*landingGrip;ball.grounded=ball.vy===0;
+        }else{ball.y=p.y+p.h+BALL_R;ball.vy=Math.abs(ball.vy)*.36*wallBounce;}
+      }else{
+        if(ball.x<p.x){ball.x=p.x-BALL_R;ball.vx=-Math.abs(ball.vx)*.56*wallBounce}
+        else{ball.x=p.x+p.w+BALL_R;ball.vx=Math.abs(ball.vx)*.56*wallBounce}
+      }
+    }
+    return true;
+  }
+
+  function checkCup(){
+    if(ball.sinking||ball.lost||ball.holed)return false;
+    const h=currentHole(),surfaceY=cupSurfaceY(h);
+    const closeX=Math.abs(ball.x-h.cup.x)<(ball.onGreen?20:15);
+    const onSurface=ball.y+BALL_R>=surfaceY-3&&ball.y<=surfaceY+5;
+    if(closeX&&onSurface&&speed()<currentBall().cupSpeed*surfacePhysics().cupCatch){
+      ball.x=h.cup.x;ball.y=surfaceY-BALL_R;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=false;
+      ball.sinking=true;ball.sinkStart=performance.now();ball.sinkSurfaceY=surfaceY;
+      showMessage('In the hole!',700);
+      setTimeout(()=>{if(playing&&ball.sinking){ball.sinking=false;ball.holed=true;completeHole();}},440);
+      return true;
+    }
+    return false;
+  }
+
+  function loseBall(){
+    if(ball.lost||ball.sinking||ball.holed)return;
+    const th=currentTheme();
+    lossEffect={kind:th.hazardKind,x:clamp(ball.x,34,W-34),y:H-th.hazardDepth+8,start:performance.now(),color:th.effectColor};
+    ball.lost=true;ball.moving=true;ball.vx=ball.vy=0;
+    showMessage(th.lossText,950);
+    setTimeout(()=>{
+      if(!playing)return;
+      ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.lost=false;restTimer=0;
+      ball.onGreen=!!lastSafe.onGreen;selectedBallType=ball.onGreen?'standard':currentHole().ballType;
+      showMessage('Play again from the last spot',750);updateHud();
+    },700);
+  }
+
+  function physics(dt){
+    if(!playing||paused||!ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    const prevX=ball.x,prevY=ball.y;
+    ball.grounded=false;
+    const bt=currentBall(),sf=surfacePhysics();
+    ball.vy+=GRAVITY*bt.gravity*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+    ball.vx*=Math.pow(.998,dt*60);
+
+    // Side and ceiling walls remain usable for deliberate bank shots.
+    if(ball.x<BALL_R+8){ball.x=BALL_R+8;ball.vx=Math.abs(ball.vx)*.66*bt.wallBounce*sf.wallBounce}
+    if(ball.x>W-BALL_R-8){ball.x=W-BALL_R-8;ball.vx=-Math.abs(ball.vx)*.66*bt.wallBounce*sf.wallBounce}
+    if(ball.y<BALL_R+8){ball.y=BALL_R+8;ball.vy=Math.abs(ball.vy)*.62*bt.wallBounce*sf.wallBounce}
+
+    // Falling into the themed hazard at the bottom loses the ball.
+    if(ball.y>H-currentTheme().hazardDepth+BALL_R*.45){loseBall();return;}
+
+    for(const p of currentHole().platforms)resolvePlatform(p,prevX,prevY);
+    if(checkCup())return;
+
+    // Rolling resistance on grass, separate from impact damping.
+    if(ball.grounded&&ball.vy===0){
+      const surfaceDecay=Math.min(.9988,bt.rollDecay*sf.rollDecay);
+      ball.vx*=Math.pow(surfaceDecay,dt*60);
+      const stopSpeed=ball.onGreen&&onGreenPlatform()?4:sf.surface==='Soft sand'?5:sf.surface==='Slippery snow'?3:7;
+      if(Math.abs(ball.vx)<stopSpeed)ball.vx=0;
+    }
+
+    const sp=speed();
+    if(sp<11&&ball.grounded){
+      restTimer+=dt;
+      if(restTimer>.28){ball.vx=ball.vy=0;ball.moving=false;lastSafe={x:ball.x,y:ball.y,onGreen:onGreenPlatform()};showMessage('Ready for next shot',650);updateHud();}
+    }else restTimer=0;
+  }
+
+  function hitBall(){
+    if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    const putting=puttingMode();
+    strokes++;
+    if(putting){
+      // On the cup platform every shot is a true putt: horizontal only, no loft.
+      const dir=Math.cos(angle)<0?-1:1;
+      activatePuttingGreen();
+      // Standard white ball, consistent green friction, and power scaled to cup distance.
+      // A moderate charge can reach the cup even on a long putting green.
+      const dist=Math.abs(currentHole().cup.x-ball.x);
+      const targetSpeed=clamp(65+dist*.56,115,340);
+      const powerFactor=.82+(power/100)*.55;
+      const sp=targetSpeed*powerFactor;
+      ball.vx=dir*sp;ball.vy=0;ball.grounded=true;
+    }else{
+      const sp=(300+power*5.6)*currentBall().launch;
+      ball.vx=Math.cos(angle)*sp;ball.vy=Math.sin(angle)*sp;ball.grounded=false;
+    }
+    ball.moving=true;ball.lost=false;ball.sinking=false;restTimer=0;updateHud();
+  }
+
+  function holeResultLabel(diff){
+    return diff<=-3?'Albatross!':diff===-2?'Eagle!':diff===-1?'Birdie!':diff===0?'Par!':diff===1?'Bogey!':`+${diff}`;
+  }
+
+  function showHoleVictory(diff){
+    const h=currentHole();
+    const finalHole=holeIndex===holes.length-1;
+    holeWinTitle.textContent=finalHole?'Final Hole Complete!':'Hole Complete!';
+    holeWinResult.textContent=holeResultLabel(diff);
+    holeWinDetails.textContent=`${strokes} ${strokes===1?'stroke':'strokes'} · Par ${h.par}`;
+    startCard.style.display='none';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
+    holeWinCard.style.display='block';overlay.classList.remove('hidden');
+  }
+
+  function completeHole(){
+    const h=currentHole(),diff=strokes-h.par;
+    totalScore+=diff;results.push({hole:holeIndex+1,par:h.par,strokes,diff});
+    // Keep the ball permanently hidden after it drops into the cup.
+    ball.holed=true;ball.sinking=false;ball.moving=false;ball.vx=ball.vy=0;
+    showHoleVictory(diff);
+    setTimeout(()=>{
+      if(!playing)return;
+      holeWinCard.style.display='none';
+      if(holeIndex>=holes.length-1)finishRound();
+      else{holeIndex++;loadHole(holeIndex,true);overlay.classList.add('hidden');showMessage(`${currentTheme().label} · ${currentTheme().surface} · ${currentBall().label} ball`,1450)}
+    },1550);
+  }
+
+  function finishRound(){
+    playing=false;
+    endTitle.textContent='Victory!';
+    finalScoreBanner.textContent=`Final score ${scoreText(totalScore)}`;
+    endSummary.textContent=`You completed all 9 holes on ${difficultySettings[selectedDifficulty].label} difficulty. The next round will generate a completely new course with mixed themes and random ball types.`;
+    scoreGrid.innerHTML='';
+    for(const r of results){const d=document.createElement('div');d.className='scorecell';d.innerHTML=`Hole ${r.hole}<strong>${r.strokes}</strong>Par ${r.par}`;scoreGrid.appendChild(d)}
+    startCard.style.display='none';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='block';overlay.classList.remove('hidden');
+  }
+
+  function showBallSelection(idx){
+    holeIndex=idx;choosingBall=false;
+    ballCard.style.display='none';
+    overlay.classList.add('hidden');
+  }
+
+  function chooseBall(type){
+    selectedBallType=type;
+  }
+
+  function startGame(){
+    holes=generateCourse(selectedDifficulty);
+    results=[];totalScore=0;holeIndex=0;playing=true;paused=false;selectedBallType='standard';
+    startCard.style.display='none';ballCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
+    overlay.classList.add('hidden');
+    loadHole(0,true);
+    showMessage(`${currentTheme().label} · ${currentTheme().surface} · ${currentBall().label} ball`,1500);
+  }
+
+  function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
+
+  function resetBall(){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.grounded=true;ball.onGreen=!!lastSafe.onGreen;selectedBallType=ball.onGreen?'standard':currentHole().ballType;showMessage('Ball reset',600);updateHud()}
+  function adjustAngle(delta){
+    if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    if(puttingMode()){
+      angle=delta<0?Math.PI:0;
+      updateControlMode();
+      return;
+    }
+    angle+=delta;angle=clamp(angle,-Math.PI+.08,Math.PI-.08);
+  }
+
+  function beginCharge(e){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;e.preventDefault();charging=true;chargeStart=performance.now();hitBtn.setPointerCapture?.(e.pointerId);chargeLoop()}
+  function chargeLoop(){if(!charging)return;const t=(performance.now()-chargeStart)/1000;power=20+80*((Math.sin(t*2.7-Math.PI/2)+1)/2);updatePower();chargeRAF=requestAnimationFrame(chargeLoop)}
+  function releaseCharge(e){if(!charging)return;e?.preventDefault();charging=false;if(chargeRAF)cancelAnimationFrame(chargeRAF);hitBall()}
+
+  let aimHold=null;
+  function startAim(dir,e){e.preventDefault();adjustAngle(dir*.07);clearInterval(aimHold);aimHold=setInterval(()=>adjustAngle(dir*.045),55)}
+  function stopAim(){clearInterval(aimHold);aimHold=null}
+
+  leftBtn.addEventListener('pointerdown',e=>startAim(-1,e));rightBtn.addEventListener('pointerdown',e=>startAim(1,e));
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>{leftBtn.addEventListener(ev,stopAim);rightBtn.addEventListener(ev,stopAim)});
+  hitBtn.addEventListener('pointerdown',beginCharge);hitBtn.addEventListener('pointerup',releaseCharge);hitBtn.addEventListener('pointercancel',()=>{charging=false;if(chargeRAF)cancelAnimationFrame(chargeRAF)});
+  resetBtn.addEventListener('click',resetBall);
+  pauseBtn.addEventListener('click',()=>{if(!playing||choosingBall)return;paused=true;startCard.style.display='none';ballCard.style.display='none';endCard.style.display='none';pauseCard.style.display='block';overlay.classList.remove('hidden')});
+  continueBtn.addEventListener('click',()=>{paused=false;pauseCard.style.display='none';overlay.classList.add('hidden')});
+  restartHoleBtn.addEventListener('click',()=>{paused=false;pauseCard.style.display='none';overlay.classList.add('hidden');loadHole(holeIndex,true)});
+  difficultyBtns.forEach(b=>b.addEventListener('click',()=>setDifficulty(b.dataset.difficulty)));
+  ballBtns.forEach(b=>b.addEventListener('click',()=>chooseBall(b.dataset.ball)));
+  titleBtn.addEventListener('click',toTitle);endMenuBtn.addEventListener('click',toTitle);startBtn.addEventListener('click',startGame);againBtn.addEventListener('click',startGame);
+
+  canvas.addEventListener('pointerdown',e=>{
+    if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+    if(puttingMode()){
+      angle=x<ball.x?Math.PI:0;
+      updateControlMode();
+    }else{
+      angle=Math.atan2(y-ball.y,x-ball.x);
+    }
+  });
+
+  function frame(t){const dt=Math.min(.025,(t-lastTime)/1000);lastTime=t;physics(dt);draw();requestAnimationFrame(frame)}
+  holes=generateCourse(selectedDifficulty);setDifficulty(selectedDifficulty);loadHole(0,true);draw();requestAnimationFrame(frame);
+})();
+</script>
 </body>
 </html>
