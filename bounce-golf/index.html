@@ -109,7 +109,7 @@
           <button class="ballBtn" data-ball="standard"><span class="ballDot ball-standard"></span><strong>Standard</strong><small>Balanced flight, bounce and roll.</small></button>
           <button class="ballBtn" data-ball="heavy"><span class="ballDot ball-heavy"></span><strong>Heavy</strong><small>Falls faster and barely bounces. Harder to climb.</small></button>
           <button class="ballBtn" data-ball="bouncy"><span class="ballDot ball-bouncy"></span><strong>Bouncy</strong><small>Big rebounds for trick shots. Harder to control.</small></button>
-          <button class="ballBtn" data-ball="sticky"><span class="ballDot ball-sticky"></span><strong>Sticky</strong><small>Sticks to platform tops, sides and undersides, and screen walls. Not the hazard below!</small></button>
+          <button class="ballBtn" data-ball="sticky"><span class="ballDot ball-sticky"></span><strong>Sticky</strong><small>Sticks to every platform face, side walls and ceiling. Never the bottom hazard!</small></button>
         </div>
       </div>
       <div class="card victoryCard" id="holeWinCard" style="display:none">
@@ -167,6 +167,10 @@
   const ballBtns=[...document.querySelectorAll('.ballBtn')];
 
   const GRAVITY=620, BALL_R=10;
+  // A ball can only rest on grass when its centre is properly above the island.
+  // Corner contact on its own is not enough to suspend an ordinary ball.
+  const EDGE_INSET=3;
+
   let holes=[];
 
   let holeIndex=0,strokes=0,totalScore=0,results=[],playing=false,paused=false;
@@ -224,11 +228,14 @@
   };
   // Every cup platform is a true putting green: consistent grass physics in all worlds.
   const greenSurface={surface:'Putting green',groundBounce:.20,landingGrip:1,rollDecay:1.004,puttSpeed:1,wallBounce:1,cupCatch:1.55};
-  const onGreenPlatform=()=>{
-    if(!ball.onGreen)return false;
-    const p=cupPlatform();
-    return !!p&&ball.x>=p.x-BALL_R&&ball.x<=p.x+p.w+BALL_R&&Math.abs(ball.y+BALL_R-p.y)<15;
-  };
+  function supportPlatform(x=ball.x,y=ball.y){
+    if(!holes.length)return null;
+    return currentHole().platforms.find(p=>
+      x>=p.x+EDGE_INSET&&x<=p.x+p.w-EDGE_INSET&&
+      Math.abs((y+BALL_R)-p.y)<12
+    )||null;
+  }
+  const onGreenPlatform=()=>ball.onGreen&&supportPlatform()===cupPlatform();
   const surfacePhysics=()=>onGreenPlatform()?greenSurface:currentTheme();
   function activatePuttingGreen(){
     if(ball.onGreen)return;
@@ -521,9 +528,8 @@
     if(ball.attached&&ball.attached!=='top')return false;
     const p=cupPlatform();
     if(!p)return false;
-    const onTop=Math.abs((ball.y+BALL_R)-p.y)<12;
-    const overPlatform=ball.x>=p.x-BALL_R&&ball.x<=p.x+p.w+BALL_R;
-    return onTop&&overPlatform;
+    // A ball that only grazes the corner must not enter putting mode.
+    return supportPlatform()===p;
   }
 
   function updateControlMode(){
@@ -598,7 +604,13 @@
   function resolvePlatform(p,prevX,prevY){
     const hit=circleRectCollision(p);if(!hit)return false;
     const wasAbove=prevY+BALL_R<=p.y+2,wasBelow=prevY-BALL_R>=p.y+p.h-2,wasLeft=prevX+BALL_R<=p.x+2,wasRight=prevX-BALL_R>=p.x+p.w-2;
-    if(p===cupPlatform()&&(wasAbove||(ball.y<p.y&&ball.vy>=0)))activatePuttingGreen();
+    const topSupported=ball.x>=p.x+EDGE_INSET&&ball.x<=p.x+p.w-EDGE_INSET;
+    const fallingOntoTop=(wasAbove||(ball.y<p.y&&ball.vy>=0));
+    // Apart from Sticky, a ball whose centre passes the lip must fall off.
+    // The old generic collision branch would hold it up by a platform corner.
+    if(selectedBallType!=='sticky'&&!topSupported&&
+       ball.y<p.y+BALL_R*.70&&prevY<=p.y+BALL_R)return false;
+    if(p===cupPlatform()&&topSupported&&fallingOntoTop)activatePuttingGreen();
 
     // A sticky ball adheres to every solid platform face, including sides and
     // undersides, without falling away. The cup's top is the exception: it
@@ -620,6 +632,16 @@
       }
       const safeX=clamp(ball.x,p.x+BALL_R*.35,p.x+p.w-BALL_R*.35);
       const safeY=clamp(ball.y,p.y+BALL_R*.35,p.y+p.h-BALL_R*.35);
+      if(face==='top'&&p===cupPlatform()){
+        // Landing on the cup island turns even a corner-catching Sticky ball
+        // into a regular playable putting ball, never a stuck green ball.
+        ball.x=safeX;ball.y=p.y-BALL_R;ball.vx=ball.vy=0;
+        ball.grounded=true;ball.moving=false;ball.attached=null;
+        activatePuttingGreen();
+        lastSafe={x:ball.x,y:ball.y,onGreen:true,attached:null};
+        updateHud();
+        return true;
+      }
       if(face==='top')stickTo(safeX,p.y-BALL_R,'top');
       else if(face==='underside')stickTo(safeX,p.y+p.h+BALL_R,'underside');
       else if(face==='left side')stickTo(p.x-BALL_R,safeY,'left side');
@@ -631,7 +653,7 @@
     const groundBounce=bt.grassBounce*sf.groundBounce;
     const landingGrip=bt.landingGrip*sf.landingGrip;
     const wallBounce=bt.wallBounce*sf.wallBounce;
-    if(wasAbove){
+    if(wasAbove&&topSupported){
       const impact=Math.abs(ball.vy);
       ball.y=p.y-BALL_R;
       if(impact>300)ball.vy=-impact*.20*groundBounce;
@@ -648,12 +670,12 @@
       const penX=Math.min(Math.abs(ball.x-(p.x-BALL_R)),Math.abs(ball.x-(p.x+p.w+BALL_R)));
       const penY=Math.min(Math.abs(ball.y-(p.y-BALL_R)),Math.abs(ball.y-(p.y+p.h+BALL_R)));
       if(penY<penX){
-        if(ball.y<p.y){
+        if(ball.y<p.y&&topSupported){
           const impact=Math.abs(ball.vy);ball.y=p.y-BALL_R;
           ball.vy=impact>260?-impact*.16*groundBounce:0;
           if(Math.abs(ball.vy)<18)ball.vy=0;
           ball.vx*=.95*landingGrip;ball.grounded=ball.vy===0;
-        }else{ball.y=p.y+p.h+BALL_R;ball.vy=Math.abs(ball.vy)*.36*wallBounce;}
+        }else if(ball.y>=p.y){ball.y=p.y+p.h+BALL_R;ball.vy=Math.abs(ball.vy)*.36*wallBounce;}
       }else{
         if(ball.x<p.x){ball.x=p.x-BALL_R;ball.vx=-Math.abs(ball.vx)*.56*wallBounce}
         else{ball.x=p.x+p.w+BALL_R;ball.vx=Math.abs(ball.vx)*.56*wallBounce}
@@ -691,32 +713,48 @@
     },700);
   }
 
-  function stableSupportPlatform(){
-    // A stopped ball needs real support beneath its centre. A tiny corner
-    // overlap is not enough: in that case it should continue falling.
-    const supportInset=BALL_R*.38;
-    return currentHole().platforms.find(p=>{
-      const onTop=Math.abs((ball.y+BALL_R)-p.y)<=3.5;
-      const enoughOverlap=ball.x>=p.x+supportInset&&ball.x<=p.x+p.w-supportInset;
-      return onTop&&enoughOverlap;
-    })||null;
-  }
+  function stickyFlight(dt){
+    // Sweep the Sticky ball in short steps so a fast shot cannot skip through
+    // a thin platform, a corner, an underside or a screen wall in one frame.
+    // The bottom hazard is checked on EVERY step and never becomes adhesive.
+    const distance=Math.hypot(ball.vx*dt,ball.vy*dt+.5*GRAVITY*dt*dt);
+    const steps=Math.max(1,Math.min(128,Math.ceil(distance/(BALL_R*.36))));
+    const step=dt/steps;
+    for(let i=0;i<steps;i++){
+      const prevX=ball.x,prevY=ball.y;
+      ball.grounded=false;
+      ball.vy+=GRAVITY*currentBall().gravity*step;
+      ball.x+=ball.vx*step;
+      ball.y+=ball.vy*step;
+      ball.vx*=Math.pow(.998,step*60);
 
-  function edgeSupportCheck(){
-    if(!ball.grounded||ball.vy!==0||ball.attached)return;
-    if(stableSupportPlatform())return;
-    ball.grounded=false;ball.moving=true;restTimer=0;
-    const nearest=currentHole().platforms
-      .filter(p=>Math.abs((ball.y+BALL_R)-p.y)<=5)
-      .sort((a,b)=>Math.min(Math.abs(ball.x-a.x),Math.abs(ball.x-(a.x+a.w)))-Math.min(Math.abs(ball.x-b.x),Math.abs(ball.x-(b.x+b.w))))[0];
-    if(nearest&&Math.abs(ball.vx)<8){
-      const mid=nearest.x+nearest.w/2;
-      ball.vx=ball.x<mid?-18:18;
+      // No sticking to the floor, water, lava, sand or other bottom hazard.
+      if(ball.y+BALL_R>H-currentTheme().hazardDepth+4){loseBall();return;}
+      if(ball.x<=BALL_R+8){stickTo(BALL_R+8,ball.y,'left wall');return;}
+      if(ball.x>=W-BALL_R-8){stickTo(W-BALL_R-8,ball.y,'right wall');return;}
+      if(ball.y<=BALL_R+8){stickTo(ball.x,BALL_R+8,'ceiling');return;}
+
+      for(const p of currentHole().platforms){
+        if(resolvePlatform(p,prevX,prevY)){
+          // Every platform face catches Sticky. On the cup's top, it
+          // instead becomes the ordinary putting ball as before.
+          if(ball.attached||ball.onGreen||!ball.moving)return;
+        }
+      }
     }
   }
 
   function physics(dt){
-    if(!playing||paused||!ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    if(!playing||paused||ball.sinking||ball.lost||ball.holed)return;
+    if(!ball.moving){
+      // Recover from any unsupported resting position instead of freezing.
+      // An attached Sticky ball deliberately stays put on every solid face.
+      if(ball.attached)return;
+      if(supportPlatform())return;
+      ball.moving=true;ball.grounded=false;ball.vy=Math.max(0,ball.vy);
+      restTimer=0;
+    }
+    if(selectedBallType==='sticky'&&!ball.onGreen){stickyFlight(dt);return;}
     const prevX=ball.x,prevY=ball.y;
     ball.grounded=false;
     const bt=currentBall(),sf=surfacePhysics();
@@ -744,10 +782,9 @@
     for(const p of currentHole().platforms){
       if(resolvePlatform(p,prevX,prevY)&&ball.attached)return;
     }
+    // At a lip or corner, ordinary balls have no support and must keep falling.
+    if(ball.grounded&&!supportPlatform())ball.grounded=false;
     if(checkCup())return;
-
-    // Never freeze a normal ball on the very edge of a platform.
-    edgeSupportCheck();
 
     // Rolling resistance on grass, separate from impact damping.
     if(ball.grounded&&ball.vy===0){
@@ -758,13 +795,19 @@
     }
 
     const sp=speed();
-    if(sp<11&&ball.grounded&&stableSupportPlatform()){
+    if(sp<11&&ball.grounded&&supportPlatform()){
       restTimer+=dt;
-      if(restTimer>.28){ball.vx=ball.vy=0;ball.moving=false;ball.attached=null;lastSafe={x:ball.x,y:ball.y,onGreen:onGreenPlatform(),attached:null};showMessage('Ready for next shot',650);updateHud();}
-    }else{
-      restTimer=0;
-      if(ball.grounded&&!ball.attached&&!stableSupportPlatform()){ball.grounded=false;ball.moving=true;}
-    }
+      if(restTimer>.28){
+        const platform=supportPlatform();
+        if(!platform){restTimer=0;return;}
+        // The resting point is a safe landing, never a floating corner.
+        ball.x=clamp(ball.x,platform.x+EDGE_INSET,platform.x+platform.w-EDGE_INSET);
+        ball.y=platform.y-BALL_R;
+        ball.vx=ball.vy=0;ball.moving=false;ball.attached=null;
+        lastSafe={x:ball.x,y:ball.y,onGreen:onGreenPlatform(),attached:null};
+        showMessage('Ready for next shot',650);updateHud();
+      }
+    }else restTimer=0;
   }
 
   function hitBall(){
