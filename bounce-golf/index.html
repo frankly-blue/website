@@ -186,9 +186,9 @@
   const lerp=(a,b,t)=>a+(b-a)*t;
 
   const difficultySettings={
-    easy:{count:[3,5],width:[155,225],gap:[32,62],jitterY:32,maxStep:122,height:[68,118],label:'Easy'},
-    medium:{count:[3,6],width:[125,205],gap:[45,88],jitterY:62,maxStep:150,height:[70,142],label:'Medium'},
-    hard:{count:[4,7],width:[96,170],gap:[58,108],jitterY:92,maxStep:182,height:[62,138],label:'Hard'}
+    easy:{count:[3,5],width:[185,275],gap:[26,58],jitterY:32,maxStep:122,height:[68,118],label:'Easy'},
+    medium:{count:[3,6],width:[155,240],gap:[38,82],jitterY:62,maxStep:150,height:[70,142],label:'Medium'},
+    hard:{count:[4,7],width:[120,205],gap:[50,102],jitterY:92,maxStep:182,height:[62,138],label:'Hard'}
   };
 
   const ballTypes={
@@ -254,9 +254,9 @@
 
     // Build varied widths. At least some holes contain a noticeably long landing island.
     let widths=Array.from({length:count},(_,i)=>rand(cfg.width[0],cfg.width[1])*(i===0||i===count-1?1.08:1));
-    if(Math.random()<.78){
+    if(Math.random()<.90){
       const longIndex=randInt(0,count-1);
-      widths[longIndex]*=rand(1.35,1.85);
+      widths[longIndex]*=rand(1.45,2.05);
       if(count>=5&&Math.random()<.28){
         let second=randInt(0,count-1);if(second===longIndex)second=(second+2)%count;
         widths[second]*=rand(1.20,1.55);
@@ -314,7 +314,24 @@
         y=lerp(startY,endY,u)+rand(-cfg.jitterY,cfg.jitterY);
       }
       if(i>0)y=clamp(y,previousY-cfg.maxStep,previousY+cfg.maxStep);
-      y=clamp(y,topY,bottomY);previousY=y;
+      y=clamp(y,topY,bottomY);
+
+      // Some neighbouring islands form one continuous stepped landform.
+      // They can touch/overlap horizontally while their tops sit at different heights.
+      if(i>0 && Math.random()<(difficulty==='easy'?.34:difficulty==='medium'?.27:.20)){
+        const prevSortedIndex=dir===1?i-1:count-i;
+        const thisSortedIndex=dir===1?i:count-1-i;
+        const prevRight=xs[prevSortedIndex]+widths[prevSortedIndex];
+        if(dir===1){
+          xs[thisSortedIndex]=prevRight-rand(4,18);
+        }else{
+          xs[thisSortedIndex]=xs[prevSortedIndex]-widths[thisSortedIndex]+rand(4,18);
+        }
+        // Keep a visible step instead of making a flat merged platform.
+        const step=rand(28,Math.min(82,cfg.maxStep*.58))*(Math.random()<.5?-1:1);
+        y=clamp(previousY+step,topY,bottomY);
+      }
+      previousY=y;
       const sortedIndex=dir===1?i:count-1-i;
       const p={x:xs[sortedIndex],y,w:widths[sortedIndex],h:rand(cfg.height[0],cfg.height[1]),flowers:Math.random()<.72};
       if(Math.random()<(difficulty==='hard'?.34:.55))p.trees=[rand(.20,.80)];
@@ -322,8 +339,25 @@
     }
 
     const startPlatform=path[0],cupPlatform=path[path.length-1];
+
+    // Make the final island feel like a real green rather than a small target shelf.
+    // It is broad enough to land on, but the cup is not sitting beside the cliff edge.
+    const greenMin=difficulty==='easy'?250:difficulty==='medium'?225:205;
+    cupPlatform.w=Math.max(cupPlatform.w,Math.min(greenMin,W-cupPlatform.x-24));
+    if(dir===-1 && cupPlatform.x+cupPlatform.w>W-24){
+      cupPlatform.x=Math.max(24,W-24-cupPlatform.w);
+    }
+    // Keep the approach to the green reasonably gentle so it remains fair.
+    if(path.length>1){
+      const approach=path[path.length-2];
+      cupPlatform.y=clamp(cupPlatform.y,approach.y-105,approach.y+105);
+    }
+
     const startX=startPlatform.x+startPlatform.w*(dir===1?.27:.73);
-    const cupX=cupPlatform.x+cupPlatform.w*(dir===1?.72:.28);
+    // Cup sits well inside the green. The far side still rewards a controlled landing,
+    // without requiring several tiny putts after a successful approach.
+    const cupFraction=dir===1?rand(.58,.70):rand(.30,.42);
+    const cupX=cupPlatform.x+cupPlatform.w*cupFraction;
     const par=Math.max(3,count+(difficulty==='easy'?0:1));
     return {
       par,theme:themeKey,backdrop:randomBackdrop(themeKey),layout:layoutType,ballType:randomBallKey(),
