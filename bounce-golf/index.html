@@ -123,7 +123,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
-        <p>Nine switchback courses with long rocky terraces, short rolling slopes, uphill jumps, trees and wooden crates. Every hole has a new layout, theme and ball type.</p>
+        <p>Nine different course designs every round: long switchbacks, broken bridges, stepping islands, descending terraces and short rolling slopes. Each hole also changes theme and ball type.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
           <button class="diffBtn" data-difficulty="easy">Easy</button>
@@ -255,7 +255,21 @@
     autumn:['forest','hills','lake','city'],
     volcano:['volcano','darkHills','ashPlain']
   };
-  const layoutTypes=['uphill','uphill','uphill','downhill','downhill','uphill','downhill'];
+  // One of each route appears in every nine-hole round. The blueprints vary
+  // not just direction, but number of floors, terrace spans, jump gaps,
+  // stepping ledges, broken bridges, and slope position.
+  const layoutTemplates=[
+    {key:'grandClimb',name:'Grand Climb',up:true,land:3,portrait:4,span:.91,rights:[757,742],lefts:[195,212],start:33,end:910,bonus:0,split:-1,ramps:'late',progress3:[0,.50,1],progress4:[0,.30,.68,1]},
+    {key:'brokenBridge',name:'Broken Bridge',up:true,land:4,portrait:5,span:.84,rights:[700,769],lefts:[276,196],start:70,end:866,bonus:2,split:1,ramps:'mixed',progress4:[0,.24,.69,1],progress5:[0,.19,.42,.70,1]},
+    {key:'highRoad',name:'High Road',up:false,land:3,portrait:4,span:.75,rights:[763,687],lefts:[187,235],start:48,end:913,bonus:1,split:-1,ramps:'early',progress3:[0,.64,1],progress4:[0,.40,.67,1]},
+    {key:'narrowPass',name:'Narrow Pass',up:true,land:4,portrait:5,span:.87,rights:[661,715],lefts:[249,259],start:95,end:852,bonus:1,split:2,ramps:'sparse',progress4:[0,.29,.56,1],progress5:[0,.24,.45,.70,1]},
+    {key:'threeSteps',name:'Three Steps',up:false,land:3,portrait:4,span:.66,rights:[716,736],lefts:[239,200],start:42,end:886,bonus:1,split:-1,ramps:'mixed',progress3:[0,.37,1],progress4:[0,.23,.58,1]},
+    {key:'longRun',name:'Long Run',up:true,land:3,portrait:4,span:.70,rights:[773,750],lefts:[178,183],start:31,end:924,bonus:0,split:-1,ramps:'early',progress3:[0,.56,1],progress4:[0,.34,.73,1]},
+    {key:'canyonCrossing',name:'Canyon Crossing',up:false,land:4,portrait:5,span:.89,rights:[655,769],lefts:[280,194],start:88,end:912,bonus:2,split:1,ramps:'mixed',progress4:[0,.25,.52,1],progress5:[0,.18,.41,.75,1]},
+    {key:'skyLedges',name:'Sky Ledges',up:true,land:4,portrait:5,span:.83,rights:[734,690],lefts:[188,271],start:49,end:878,bonus:2,split:-1,ramps:'sparse',progress4:[0,.40,.66,1],progress5:[0,.30,.48,.74,1]},
+    {key:'rollingRidge',name:'Rolling Ridge',up:false,land:3,portrait:4,span:.72,rights:[692,764],lefts:[218,231],start:61,end:925,bonus:1,split:-1,ramps:'early',progress3:[0,.48,1],progress4:[0,.31,.73,1]}
+  ];
+  const layoutTypes=layoutTemplates.map(t=>t.key);
   const randomBackdrop=themeKey=>{
     const a=backdropChoices[themeKey]||['hills'];
     return a[randInt(0,a.length-1)];
@@ -297,140 +311,169 @@
     updateHud();
   }
 
-  // Purpose-built switchback routes: each long tier reverses direction.
-  // Small connector ledges sit OUTSIDE both adjacent terraces. Players can
-  // jump up from the end of one tier without striking the next one's underside.
-  // Downward ramps really have sloping colliders rather than painted slopes.
+  // Build a readable course from a distinct structural blueprint. Adjacent
+  // terraces have aligned exit/entry ends, with real outboard stepping ledges.
+  // All mirrored platforms share the same colliders as their rendered artwork.
   function generateHole(idx,difficulty,themeKey,layoutType){
-    const cfg=difficultySettings[difficulty];
-    const goingUp=layoutType!=='downhill';
-    const tierCount=H>720?4:3;
+    const template=layoutTemplates.find(t=>t.key===layoutType)||layoutTemplates[0];
+    const goingUp=template.up;
+    const tierCount=H>720?template.portrait:template.land;
     const firstDir=Math.random()<.5?1:-1;
     const hazardDepth=themes[themeKey].hazardDepth;
-    const lowest=H-hazardDepth-83;
-    const highest=H>720?135:128;
-    const tierGap=(lowest-highest)/(tierCount-1);
-    const baseLevels=Array.from({length:tierCount},(_,i)=>
-      (goingUp?lowest-i*tierGap:highest+i*tierGap));
+    const lowest=H-hazardDepth-84-rand(0,12);
+    const highest=H>720?130+rand(0,18):116+rand(0,25);
+    const fullSpan=lowest-highest;
+    const span=Math.min(fullSpan-8,fullSpan*template.span);
+    const progressBase=template['progress'+tierCount]||
+      Array.from({length:tierCount},(_,i)=>i/(tierCount-1));
+    const progress=progressBase.map((v,i)=>i===0||i===tierCount-1?v:
+      clamp(v+rand(-.014,.014),.05,.95));
+    const baseLevels=progress.map(v=>goingUp?lowest-span*v:highest+span*v);
 
-    // The side of each long terrace is deliberately inset so that the next
-    // jumping ledge can sit past it, in a clear vertical passage.
-    const tiers=Array.from({length:tierCount},(_,i)=>{
-      const dir=i%2===0?1:-1;
-      const edgeNoise=rand(-11,11);
-      const left=i===0?rand(36,53):rand(184,198);
-      const right=i===tierCount-1&&dir===1?rand(899,922):rand(750,773);
-      const x=left+edgeNoise;
-      const w=Math.max(550,right-x);
-      return {x,y:baseLevels[i],w,dir,ordinal:i,flowers:false,
-        trees:[],isGreen:i===tierCount-1};
+    // Give each route a different silhouette: wide and narrow decks alternate
+    // according to the template's right and left turns. Neighbouring deck ends
+    // stay close enough to reach the outboard stepping stone.
+    const bounds=Array.from({length:tierCount},()=>({left:null,right:null}));
+    bounds[0].left=template.start+rand(-10,10);
+    for(let i=0;i<tierCount-1;i++){
+      if(i%2===0){
+        const anchor=template.rights[Math.floor(i/2)]||730;
+        const e=clamp(anchor+rand(-13,13),635,779);
+        bounds[i].right=e+rand(-10,10);
+        bounds[i+1].right=e+rand(-22,22);
+      }else{
+        const anchor=template.lefts[Math.floor(i/2)]||210;
+        const e=clamp(anchor+rand(-13,13),183,300);
+        bounds[i].left=e+rand(-9,9);
+        bounds[i+1].left=e+rand(-23,23);
+      }
+    }
+    if((tierCount-1)%2===0){bounds[tierCount-1].right=template.end+rand(-11,11);}
+    else{bounds[tierCount-1].left=W-template.end+rand(-11,11);}
+
+    const tiers=bounds.map((b,i)=>{
+      const x=clamp(b.left,27,W-390);
+      const right=clamp(b.right,x+370,W-27);
+      return {x,y:baseLevels[i],w:right-x,dir:i%2===0?1:-1,
+        ordinal:i,flowers:false,trees:[],isGreen:i===tierCount-1};
     });
-    // Keep x layouts readable on both left-first and right-first courses.
-    // Mirroring the geometry preserves identical difficulty in either direction.
     const mirror=p=>{
       p.x=W-p.x-p.w;
       if(p.dir)p.dir=-p.dir;
       if(p.isSlope){p.y+=p.dy;p.dy=-p.dy;}
     };
-
     const platforms=[],mainPlatforms=[],slopes=[],transitions=[];
     for(let i=0;i<tierCount;i++){
       const tier=tiers[i];
       const isGreen=i===tierCount-1;
-      const tierDir=tier.dir;
-      const rockHeight=rand(34,47);
-      // The opening flat gives the player room to launch. Ramps live near
-      // an exit and are short enough to roll naturally, never on the cup flat.
-      const useSlope=!isGreen&&(i===0||Math.random()<.8);
-      const rampW=useSlope?rand(62,88):0;
-      const rampDrop=useSlope?rand(16,27):0;
-      const runout=useSlope?rand(65,97):0;
+      const dir=tier.dir;
+      const rockHeight=rand(33,44);
+      // Different blueprints place their genuine gravity-driven down ramps
+      // near the entrance, at the exit, or leave selected decks flat.
+      const mode=template.ramps;
+      const useSlope=!isGreen&&i!==template.split&&(
+        i===0||mode==='early'||mode==='late'||
+        (mode==='mixed'?i%2===0:Math.random()<.50));
+      const rampW=useSlope?rand(56,82):0;
+      const rampDrop=useSlope?rand(15,27):0;
+      const early=mode==='early'||(mode==='mixed'&&i%2===1);
+      const runout=useSlope?(early?Math.min(tier.w*.40,rand(152,245)):rand(59,93)):0;
       const flatW=tier.w-rampW-runout;
       let parts;
       if(!useSlope){
         parts=[{x:tier.x,y:tier.y,w:tier.w,h:rockHeight,
-          isGreen,dir:tierDir,flowers:false,ordinal:i}];
-      }else if(tierDir===1){
+          isGreen,dir,flowers:false,ordinal:i}];
+      }else if(dir===1){
         parts=[
-          {x:tier.x,y:tier.y,w:flatW,h:rockHeight,dir:tierDir,flowers:false,ordinal:i},
-          {x:tier.x+flatW,y:tier.y,w:rampW,h:rockHeight,dy:rampDrop,isSlope:true,
-            dir:tierDir,flowers:false,ordinal:i},
+          {x:tier.x,y:tier.y,w:flatW,h:rockHeight,dir,flowers:false,ordinal:i},
+          {x:tier.x+flatW,y:tier.y,w:rampW,h:rockHeight,dy:rampDrop,
+            isSlope:true,dir,flowers:false,ordinal:i},
           {x:tier.x+flatW+rampW,y:tier.y+rampDrop,w:runout,h:rockHeight,
-            dir:tierDir,flowers:false,ordinal:i}
+            dir,flowers:false,ordinal:i}
         ];
       }else{
         parts=[
-          {x:tier.x+rampW+runout,y:tier.y,w:flatW,h:rockHeight,dir:tierDir,flowers:false,ordinal:i},
+          {x:tier.x+rampW+runout,y:tier.y,w:flatW,h:rockHeight,dir,flowers:false,ordinal:i},
           {x:tier.x+runout,y:tier.y+rampDrop,w:rampW,h:rockHeight,dy:-rampDrop,
-            isSlope:true,dir:tierDir,flowers:false,ordinal:i},
-          {x:tier.x,y:tier.y+rampDrop,w:runout,h:rockHeight,dir:tierDir,flowers:false,ordinal:i}
+            isSlope:true,dir,flowers:false,ordinal:i},
+          {x:tier.x,y:tier.y+rampDrop,w:runout,h:rockHeight,dir,flowers:false,ordinal:i}
         ];
       }
-      const first=parts[0];
-      if(!isGreen&&i>0&&Math.random()<.64){
-        // Scenery is deliberately off the tee, the transition ledges and cup.
-        first.trees=[first.dir===1?.32:.69];
+      // Broken bridges really have a playable gap. Only a middle tier is
+      // split, never the tee or the flat final green.
+      if(!isGreen&&i===template.split){
+        const j=parts.reduce((best,p,k)=>!p.isSlope&&p.w>parts[best].w?k:best,0);
+        const target=parts[j];
+        const gap=difficulty==='easy'?rand(27,38):difficulty==='hard'?rand(56,76):rand(39,55);
+        if(!target.isSlope&&target.w>gap+240){
+          const leftW=(target.w-gap)*rand(.44,.56);
+          parts.splice(j,1,
+            {...target,w:leftW},
+            {...target,x:target.x+leftW+gap,w:target.w-leftW-gap});
+        }
+      }
+      const scenic=parts.find(p=>!p.isSlope&&p.w>180);
+      if(scenic&&!isGreen&&Math.random()<.75){
+        scenic.trees=[dir===1?.20:.80];
       }
       platforms.push(...parts);
       mainPlatforms.push(...parts);
-      for(const p of parts)if(p.isSlope)slopes.push(p);
+      parts.filter(p=>p.isSlope).forEach(p=>slopes.push(p));
       tier.parts=parts;
       tier.exitY=tier.y+rampDrop;
     }
 
-    // Two-stage vertical transitions are easy to read and physically reachable:
-    // 1) shoot off the end of a terrace onto a small outboard ledge,
-    // 2) reverse aim to reach the long terrace above (or below).
     for(let i=0;i<tierCount-1;i++){
       const from=tiers[i],to=tiers[i+1];
       const exitDir=from.dir;
-      const connectorWidth=rand(106,124);
-      const rightSide=exitDir===1;
-      const edgeFrom=rightSide?from.x+from.w:from.x;
-      const edgeTo=rightSide?to.x+to.w:to.x;
-      let stepX=rightSide?Math.max(edgeFrom,edgeTo)+rand(12,19):
-                            Math.min(edgeFrom,edgeTo)-connectorWidth-rand(12,19);
-      // Avoid the canvas frame while maintaining at least one ball-wide gap.
-      stepX=clamp(stepX,26,W-26-connectorWidth);
-      const currentExit=from.exitY;
-      const nextEntrance=to.y;
-      const stepY=lerp(currentExit,nextEntrance,rand(.45,.54));
-      const connector={x:stepX,y:stepY,w:connectorWidth,h:32,flowers:false,
-        isConnector:true,dir:-exitDir,fromTier:i,toTier:i+1};
+      const connectorWidth=rand(94,122);
+      const edgeFrom=exitDir===1?from.x+from.w:from.x;
+      const edgeTo=exitDir===1?to.x+to.w:to.x;
+      let stepX=exitDir===1?Math.max(edgeFrom,edgeTo)+rand(12,18):
+        Math.min(edgeFrom,edgeTo)-connectorWidth-rand(12,18);
+      stepX=clamp(stepX,25,W-25-connectorWidth);
+      const stepY=lerp(from.exitY,to.y,rand(.43,.56));
+      const connector={x:stepX,y:stepY,w:connectorWidth,h:30,
+        flowers:false,isConnector:true,dir:-exitDir,fromTier:i,toTier:i+1};
       platforms.push(connector);transitions.push(connector);
     }
 
-    // A short apron can feed the ball down onto the final, *flat* green.
-    // It is a real ramp, independent of the normal-green putt collider.
+    // Optional intermediate landing islands alter the jumping route and the
+    // silhouette without replacing the main back-and-forth progression.
+    for(let i=0;i<Math.min(template.bonus,tierCount-1);i++){
+      const from=tiers[i],to=tiers[i+1];
+      const width=rand(93,153);
+      const x=clamp(W*.5+rand(-185,130)-width*.5,170,W-170-width);
+      const y=(from.exitY+to.y)/2+rand(-18,18);
+      const extra={x,y,w:width,h:26,flowers:false,isBonus:true,trees:[]};
+      if(platforms.every(p=>p.isCrate||extra.x+extra.w<p.x-12||extra.x>p.x+p.w+12||
+         extra.y+extra.h<p.y-19||extra.y>p.y+p.h+19)){
+        platforms.push(extra);
+      }
+    }
+
+    // The approach is a short sloping run-in, the cup is always on a level
+    // green. The measured putting distance therefore remains accurate.
     const green=tiers[tierCount-1],greenMain=green.parts[0];
-    const finalDir=green.dir;
-    const apronW=rand(59,74),apronDrop=rand(13,20);
-    const apron=finalDir===1?{
+    const apronW=rand(57,75),apronDrop=rand(13,20);
+    const apron=green.dir===1?{
       x:green.x-apronW,y:green.y-apronDrop,w:apronW,h:31,dy:apronDrop,
       isSlope:true,isApronSlope:true,flowers:false
     }:{
       x:green.x+green.w,y:green.y,w:apronW,h:31,dy:-apronDrop,
       isSlope:true,isApronSlope:true,flowers:false
     };
-    if(apron.x>22&&apron.x+apron.w<W-22){
-      // The apron must not overhang an existing main surface at this height.
-      platforms.push(apron);slopes.push(apron);
-    }
+    if(apron.x>22&&apron.x+apron.w<W-22){platforms.push(apron);slopes.push(apron);}
 
-    // A crate is a modest optional trick-shot obstacle, never an impassable
-    // block at the end of a terrace or on the putting green.
+    // Occasional modest crates for trick shots, never on the putting green.
     const crates=[];
-    if(difficulty!=='easy'&&Math.random()<.38){
-      const middle=tiers[Math.min(tierCount-2,1)].parts[0];
-      if(middle&&middle.w>390){
-        const size=rand(28,34);
-        crates.push({x:middle.x+middle.w*.48-size/2,y:middle.y-size,w:size,h:size,
-          isCrate:true,flowers:false});
-      }
+    if(difficulty!=='easy'&&Math.random()<.43){
+      const p=tiers[Math.min(tierCount-2,1)].parts.find(q=>!q.isSlope&&q.w>360);
+      if(p){const size=rand(26,34);crates.push({x:p.x+p.w*.52-size/2,
+        y:p.y-size,w:size,h:size,isCrate:true,flowers:false});}
     }
     platforms.push(...crates);
 
-    // Mirror the complete route after all joins and ramp directions are set.
     if(firstDir===-1){
       const seen=new Set();
       for(const p of [...platforms,...tiers])if(!seen.has(p)){
@@ -438,16 +481,14 @@
       }
     }
     const tee=tiers[0],cupTier=tiers[tierCount-1];
-    const teeDir=tee.dir,greenDir=cupTier.dir;
-    const startX=teeDir===1?tee.x+76:tee.x+tee.w-76;
-    const cupX=greenDir===1?cupTier.x+cupTier.w*.76:cupTier.x+cupTier.w*.24;
-    const par=difficulty==='easy'?tierCount+2:tierCount+3;
-    return {
-      par,theme:themeKey,backdrop:randomBackdrop(themeKey),layout:goingUp?'uphill':'downhill',
-      ballType:randomBallKey(),firstDirection:teeDir,tiers,transitions,slopes,
+    const startX=tee.dir===1?tee.x+67:tee.x+tee.w-67;
+    const cupX=cupTier.dir===1?cupTier.x+cupTier.w*.79:cupTier.x+cupTier.w*.21;
+    const par=(difficulty==='easy'?tierCount+2:tierCount+3)+(template.split>0?1:0);
+    return {par,theme:themeKey,backdrop:randomBackdrop(themeKey),
+      layout:goingUp?'uphill':'downhill',layoutKey:template.key,layoutName:template.name,
+      ballType:randomBallKey(),firstDirection:tee.dir,tiers,transitions,slopes,
       start:{x:startX,y:tee.y},cup:{x:cupX,y:cupTier.y},
-      mainPlatforms,platforms,greenWidth:greenMain.w
-    };
+      mainPlatforms,platforms,greenWidth:greenMain.w};
   }
 
   function generateCourse(difficulty){
@@ -488,7 +529,9 @@
     parHud.textContent=`Par ${h.par} · ${difficultySettings[selectedDifficulty].label}`;
     strokeHud.textContent=`Strokes ${strokes}`;
     scoreHud.textContent=`Score ${scoreText(totalScore)}`;
-    dirHud.textContent=h.cup.y<ball.y?'Goal ↑':h.cup.y>ball.y?'Goal ↓':'Goal →';
+    const deg=Math.round(Math.atan2(-Math.sin(angle),Math.abs(Math.cos(angle)))*180/Math.PI);
+    dirHud.textContent=!ball.moving?`Aim ${deg}° ${Math.cos(angle)<0?'←':'→'}`:
+      h.cup.y<ball.y?'Goal ↑':h.cup.y>ball.y?'Goal ↓':'Goal →';
     ballHud.textContent=ball.onGreen?`Ball Standard · Green`:ball.attached?`Sticky · Stuck (${ball.attached})`:`Ball ${currentBall().label} · ${currentTheme().label}`;
     dirHud.title=onGreenPlatform()?'Normal putting green':currentTheme().surface;
     updateControlMode();
@@ -699,11 +742,16 @@
   }
   function drawDirectionSign(x,y,dir){
     ctx.save();ctx.translate(x,y);ctx.scale(dir,1);
-    ctx.fillStyle='#875229';inkStroke('#4b3d2a',2.4);
-    ctx.fillRect(-3,-27,6,29);ctx.strokeRect(-3,-27,6,29);
-    ctx.fillStyle='#e9b85e';ctx.beginPath();ctx.moveTo(-25,-31);ctx.lineTo(7,-31);
-    ctx.lineTo(7,-38);ctx.lineTo(29,-23);ctx.lineTo(7,-8);ctx.lineTo(7,-15);
-    ctx.lineTo(-25,-15);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.lineJoin='round';
+    ctx.fillStyle='#70452b';ctx.strokeStyle='#243339';ctx.lineWidth=3;
+    ctx.fillRect(-4,-29,8,31);ctx.strokeRect(-4,-29,8,31);
+    // Higher-contrast route arrows against grass, snow and desert scenery.
+    ctx.fillStyle='#ffbe36';ctx.strokeStyle='#213842';ctx.lineWidth=4;
+    ctx.beginPath();ctx.moveTo(-26,-34);ctx.lineTo(7,-34);
+    ctx.lineTo(7,-43);ctx.lineTo(33,-23);ctx.lineTo(7,-3);
+    ctx.lineTo(7,-13);ctx.lineTo(-26,-13);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.strokeStyle='#fff1a3';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(-21,-27);ctx.lineTo(8,-27);ctx.stroke();
     ctx.restore();
   }
   function drawSlope(p){
@@ -883,9 +931,24 @@
 
   function drawAim(){
     if(ball.moving||ball.sinking||ball.lost||ball.holed||!playing||paused)return;
-    const len=puttingMode()?38:70+power*.65,ex=ball.x+Math.cos(angle)*len,ey=ball.y+Math.sin(angle)*len;
-    ctx.save();ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=4;ctx.setLineDash([9,8]);ctx.beginPath();ctx.moveTo(ball.x,ball.y);ctx.lineTo(ex,ey);ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-Math.cos(angle-.55)*15,ey-Math.sin(angle-.55)*15);ctx.lineTo(ex-Math.cos(angle+.55)*15,ey-Math.sin(angle+.55)*15);ctx.closePath();ctx.fill();ctx.restore();
+    const len=puttingMode()?68:94+power*.70;
+    const ux=Math.cos(angle),uy=Math.sin(angle);
+    const sx=ball.x+ux*15,sy=ball.y+uy*15;
+    const ex=ball.x+ux*len,ey=ball.y+uy*len;
+    ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+    // A dark outline and vivid amber centre remain visible on bright grass,
+    // pale skies, snow, sand, water and the dark volcanic world.
+    ctx.strokeStyle='rgba(20,39,48,.96)';ctx.lineWidth=12;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex-ux*9,ey-uy*9);ctx.stroke();
+    ctx.strokeStyle='#ffde40';ctx.lineWidth=7;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex-ux*9,ey-uy*9);ctx.stroke();
+    const tip=23,wing=11;
+    ctx.beginPath();ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-ux*tip-uy*wing,ey-uy*tip+ux*wing);
+    ctx.lineTo(ex-ux*tip+uy*wing,ey-uy*tip-ux*wing);
+    ctx.closePath();ctx.fillStyle='#ffdb35';ctx.fill();
+    ctx.strokeStyle='#173440';ctx.lineWidth=4.5;ctx.stroke();
+    ctx.restore();
   }
 
   function draw(){
@@ -1373,7 +1436,7 @@
       if(!playing)return;
       holeWinCard.style.display='none';
       if(holeIndex>=holes.length-1)finishRound();
-      else{holeIndex++;loadHole(holeIndex,true);overlay.classList.add('hidden');showMessage(`${currentTheme().label} · ${currentTheme().surface} · ${currentBall().label} ball`,1450)}
+      else{holeIndex++;loadHole(holeIndex,true);overlay.classList.add('hidden');showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball`,1800)}
     },1550);
   }
 
@@ -1381,7 +1444,7 @@
     playing=false;
     endTitle.textContent='Victory!';
     finalScoreBanner.textContent=`Final score ${scoreText(totalScore)}`;
-    endSummary.textContent=`You completed all 9 holes on ${difficultySettings[selectedDifficulty].label} difficulty. The next round will generate new switchback routes, slopes, mixed themes and random ball types.`;
+    endSummary.textContent=`You completed all 9 holes on ${difficultySettings[selectedDifficulty].label} difficulty. The next round will reshuffle all nine distinct routes, slopes, scenery and random ball types.`;
     scoreGrid.innerHTML='';
     for(const r of results){const d=document.createElement('div');d.className='scorecell';d.innerHTML=`Hole ${r.hole}<strong>${r.strokes}</strong>Par ${r.par}`;scoreGrid.appendChild(d)}
     startCard.style.display='none';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='block';overlay.classList.remove('hidden');
@@ -1403,7 +1466,7 @@
     startCard.style.display='none';ballCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
     overlay.classList.add('hidden');
     loadHole(0,true);
-    showMessage(`${currentTheme().label} · ${currentTheme().surface} · ${currentBall().label} ball`,1500);
+    showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball`,1800);
   }
 
   function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
