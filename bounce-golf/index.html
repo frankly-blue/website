@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Bounce Golf · Cartoon Islands</title>
-<meta name="bounce-golf-version" content="2026-09-23-natural-putting-guide">
+<meta name="bounce-golf-version" content="2026-09-23-switchback-slopes">
 <style>
   :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -123,7 +123,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
-        <p>Nine colourful cartoon courses inspired by classic platform games: grassy rock islands, stepped paths, bridges, ladders, trees and wooden crates. Every hole has a new layout, theme and ball type.</p>
+        <p>Nine switchback courses with long rocky terraces, short rolling slopes, uphill jumps, trees and wooden crates. Every hole has a new layout, theme and ball type.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
           <button class="diffBtn" data-difficulty="easy">Easy</button>
@@ -255,7 +255,7 @@
     autumn:['forest','hills','lake','city'],
     volcano:['volcano','darkHills','ashPlain']
   };
-  const layoutTypes=['climb','descend','flat','valley','peak','zigzag','rolling'];
+  const layoutTypes=['uphill','uphill','uphill','downhill','downhill','uphill','downhill'];
   const randomBackdrop=themeKey=>{
     const a=backdropChoices[themeKey]||['hills'];
     return a[randInt(0,a.length-1)];
@@ -274,10 +274,15 @@
   const greenSurface={surface:'Putting green',groundBounce:.14,landingGrip:1,rollDecay:.998,puttSpeed:1,wallBounce:1,cupCatch:1.25};
   function supportPlatform(x=ball.x,y=ball.y){
     if(!holes.length)return null;
-    return currentHole().platforms.find(p=>
-      x>=p.x+EDGE_INSET&&x<=p.x+p.w-EDGE_INSET&&
-      Math.abs((y+BALL_R)-p.y)<12
-    )||null;
+    return currentHole().platforms.find(p=>{
+      if(x<p.x+EDGE_INSET||x>p.x+p.w-EDGE_INSET)return false;
+      if(p.isSlope){
+        const s=p.dy/p.w,L=Math.hypot(1,s);
+        const topY=p.y+s*(x-p.x);
+        return Math.abs(y-(topY-BALL_R*L))<9;
+      }
+      return Math.abs((y+BALL_R)-p.y)<12;
+    })||null;
   }
   const onGreenPlatform=()=>ball.onGreen&&supportPlatform()===cupPlatform();
   const surfacePhysics=()=>onGreenPlatform()?greenSurface:currentTheme();
@@ -292,164 +297,156 @@
     updateHud();
   }
 
+  // Purpose-built switchback routes: each long tier reverses direction.
+  // Small connector ledges sit OUTSIDE both adjacent terraces. Players can
+  // jump up from the end of one tier without striking the next one's underside.
+  // Downward ramps really have sloping colliders rather than painted slopes.
   function generateHole(idx,difficulty,themeKey,layoutType){
     const cfg=difficultySettings[difficulty];
-    // Fewer, longer islands leave room for meaningful landings and connected steps.
-    const count=randInt(...(difficulty==='easy'?[3,4]:difficulty==='medium'?[3,5]:[4,5]));
-    const dir=Math.random()<.5?1:-1;
-    const margin=24,available=W-margin*2;
-    const greenWidth=rand(difficulty==='hard'?235:270,difficulty==='easy'?340:320);
-    const longIndex=count>3?randInt(1,count-2):randInt(0,count-2);
-    const widths=Array.from({length:count},(_,i)=>
-      i===count-1?greenWidth:
-      i===longIndex?rand(245,345):
-      i===0?rand(175,230):rand(145,220));
+    const goingUp=layoutType!=='downhill';
+    const tierCount=H>720?4:3;
+    const firstDir=Math.random()<.5?1:-1;
+    const hazardDepth=themes[themeKey].hazardDepth;
+    const lowest=H-hazardDepth-83;
+    const highest=H>720?135:128;
+    const tierGap=(lowest-highest)/(tierCount-1);
+    const baseLevels=Array.from({length:tierCount},(_,i)=>
+      (goingUp?lowest-i*tierGap:highest+i*tierGap));
 
-    // Zero gap means two islands genuinely meet. A joined pair is a short
-    // step rather than a huge, unplayable wall.
-    const gaps=Array.from({length:count-1},(_,i)=>{
-      if(i===count-2)return Math.random()<.72?0:rand(25,56);
-      return Math.random()<.38?0:rand(cfg.gap[0],cfg.gap[1]);
+    // The side of each long terrace is deliberately inset so that the next
+    // jumping ledge can sit past it, in a clear vertical passage.
+    const tiers=Array.from({length:tierCount},(_,i)=>{
+      const dir=i%2===0?1:-1;
+      const edgeNoise=rand(-11,11);
+      const left=i===0?rand(36,53):rand(184,198);
+      const right=i===tierCount-1&&dir===1?rand(899,922):rand(750,773);
+      const x=left+edgeNoise;
+      const w=Math.max(550,right-x);
+      return {x,y:baseLevels[i],w,dir,ordinal:i,flowers:false,
+        trees:[],isGreen:i===tierCount-1};
     });
-    // Most holes have at least one connected pair, not just random close gaps.
-    if(!gaps.some(g=>g===0)&&Math.random()<.72)gaps[randInt(0,gaps.length-1)]=0;
+    // Keep x layouts readable on both left-first and right-first courses.
+    // Mirroring the geometry preserves identical difficulty in either direction.
+    const mirror=p=>{
+      p.x=W-p.x-p.w;
+      if(p.dir)p.dir=-p.dir;
+      if(p.isSlope){p.y+=p.dy;p.dy=-p.dy;}
+    };
 
-    let gapTotal=gaps.reduce((a,b)=>a+b,0);
-    let widthTotal=widths.reduce((a,b)=>a+b,0);
-    // Shrink open gaps first; keep connected pairs exactly connected.
-    if(gapTotal+widthTotal>available){
-      const gapBudget=Math.max(0,available-widthTotal);
-      if(gapTotal>0){
-        const ratio=gapBudget/gapTotal;
-        for(let i=0;i<gaps.length;i++)if(gaps[i]>0)gaps[i]=Math.max(25,gaps[i]*ratio);
+    const platforms=[],mainPlatforms=[],slopes=[],transitions=[];
+    for(let i=0;i<tierCount;i++){
+      const tier=tiers[i];
+      const isGreen=i===tierCount-1;
+      const tierDir=tier.dir;
+      const rockHeight=rand(34,47);
+      // The opening flat gives the player room to launch. Ramps live near
+      // an exit and are short enough to roll naturally, never on the cup flat.
+      const useSlope=!isGreen&&(i===0||Math.random()<.8);
+      const rampW=useSlope?rand(62,88):0;
+      const rampDrop=useSlope?rand(16,27):0;
+      const runout=useSlope?rand(65,97):0;
+      const flatW=tier.w-rampW-runout;
+      let parts;
+      if(!useSlope){
+        parts=[{x:tier.x,y:tier.y,w:tier.w,h:rockHeight,
+          isGreen,dir:tierDir,flowers:false,ordinal:i}];
+      }else if(tierDir===1){
+        parts=[
+          {x:tier.x,y:tier.y,w:flatW,h:rockHeight,dir:tierDir,flowers:false,ordinal:i},
+          {x:tier.x+flatW,y:tier.y,w:rampW,h:rockHeight,dy:rampDrop,isSlope:true,
+            dir:tierDir,flowers:false,ordinal:i},
+          {x:tier.x+flatW+rampW,y:tier.y+rampDrop,w:runout,h:rockHeight,
+            dir:tierDir,flowers:false,ordinal:i}
+        ];
+      }else{
+        parts=[
+          {x:tier.x+rampW+runout,y:tier.y,w:flatW,h:rockHeight,dir:tierDir,flowers:false,ordinal:i},
+          {x:tier.x+runout,y:tier.y+rampDrop,w:rampW,h:rockHeight,dy:-rampDrop,
+            isSlope:true,dir:tierDir,flowers:false,ordinal:i},
+          {x:tier.x,y:tier.y+rampDrop,w:runout,h:rockHeight,dir:tierDir,flowers:false,ordinal:i}
+        ];
       }
-    }
-    gapTotal=gaps.reduce((a,b)=>a+b,0);
-    widthTotal=widths.reduce((a,b)=>a+b,0);
-    if(gapTotal+widthTotal>available){
-      // Preserve at least one long landing island and a broad final green.
-      // Shrink ordinary islands first; a crowded layout never creates tiny
-      // slivers that are impossible to land on.
-      let overflow=gapTotal+widthTotal-available;
-      const ordinary=Array.from({length:count-1},(_,i)=>i).filter(i=>i!==longIndex);
-      const order=[...ordinary,longIndex,count-1];
-      for(const i of order){
-        const minimum=i===count-1?235:i===longIndex?200:100;
-        const take=Math.min(overflow,Math.max(0,widths[i]-minimum));
-        widths[i]-=take;overflow-=take;
+      const first=parts[0];
+      if(!isGreen&&i>0&&Math.random()<.64){
+        // Scenery is deliberately off the tee, the transition ledges and cup.
+        first.trees=[first.dir===1?.32:.69];
       }
-      if(overflow>0){
-        for(let i=0;i<count-1&&overflow>0;i++){
-          const take=Math.min(overflow,Math.max(0,widths[i]-90));
-          widths[i]-=take;overflow-=take;
-        }
-      }
-      if(overflow>0){
-        const take=Math.min(overflow,Math.max(0,widths[count-1]-215));
-        widths[count-1]-=take;overflow-=take;
-      }
-    }
-    const used=widths.reduce((a,b)=>a+b,0)+gaps.reduce((a,b)=>a+b,0);
-    const spare=Math.max(0,available-used);
-    let cursor=dir===1?margin+spare/2:W-margin-spare/2;
-    const xs=[];
-    for(let i=0;i<count;i++){
-      const x=dir===1?cursor:cursor-widths[i];
-      xs.push(x);
-      cursor+=(dir===1?1:-1)*(widths[i]+(gaps[i]||0));
-    }
-
-    const hazardDepth=(themes[themeKey]?.hazardDepth||60);
-    const topY=135,bottomY=Math.max(310,H-hazardDepth-82);
-    const high=()=>rand(topY,Math.min(topY+155,bottomY-120));
-    const mid=()=>rand(topY+85,Math.max(topY+115,bottomY-85));
-    const low=()=>rand(Math.max(topY+170,bottomY-135),bottomY);
-    let startY,endY;
-    if(layoutType==='climb'){startY=low();endY=high();}
-    else if(layoutType==='descend'){startY=high();endY=low();}
-    else if(layoutType==='flat'){startY=mid();endY=clamp(startY+rand(-55,55),topY,bottomY);}
-    else if(layoutType==='valley'){startY=high();endY=high();}
-    else if(layoutType==='peak'){startY=low();endY=low();}
-    else if(layoutType==='zigzag'){startY=rand(topY+30,bottomY-30);endY=rand(topY+30,bottomY-30);}
-    else{startY=rand(topY,bottomY);endY=rand(topY,bottomY);}
-
-    const ys=[];
-    for(let i=0;i<count;i++){
-      const u=i/(count-1);
-      let y;
-      if(i===0)y=startY;
-      else if(i===count-1)y=endY;
-      else if(layoutType==='valley')y=lerp(startY,endY,u)+Math.sin(Math.PI*u)*rand(95,Math.min(210,cfg.maxStep*1.25));
-      else if(layoutType==='peak')y=lerp(startY,endY,u)-Math.sin(Math.PI*u)*rand(95,Math.min(210,cfg.maxStep*1.25));
-      else if(layoutType==='zigzag')y=mid()+(i%2?1:-1)*rand(55,Math.min(145,cfg.jitterY+70));
-      else if(layoutType==='rolling')y=lerp(startY,endY,u)+Math.sin(u*Math.PI*2+idx)*rand(35,95)+rand(-25,25);
-      else y=lerp(startY,endY,u)+rand(-cfg.jitterY,cfg.jitterY);
-      if(i>0)y=clamp(y,ys[i-1]-cfg.maxStep,ys[i-1]+cfg.maxStep);
-      ys.push(clamp(y,topY,bottomY));
-    }
-    for(let i=1;i<count;i++){
-      if(gaps[i-1]===0&&i!==count-1){
-        // Connected steps are 16–42 pixels high, in either direction.
-        const sign=Math.random()<.5?-1:1;
-        ys[i]=clamp(ys[i-1]+sign*rand(16,42),topY,bottomY);
-      }
-    }
-    if(gaps[count-2]===0){
-      // The approach apron meets the green, level or with a small downhill
-      // step. A ball can roll onto it instead of requiring another jump.
-      ys[count-1]=clamp(ys[count-2]+rand(0,10),topY,bottomY);
-    }else{
-      // A separate final island is still a reasonable landing target.
-      ys[count-1]=clamp(ys[count-1],ys[count-2]-Math.min(85,cfg.maxStep),ys[count-2]+Math.min(85,cfg.maxStep));
+      platforms.push(...parts);
+      mainPlatforms.push(...parts);
+      for(const p of parts)if(p.isSlope)slopes.push(p);
+      tier.parts=parts;
+      tier.exitY=tier.y+rampDrop;
     }
 
-    const path=Array.from({length:count},(_,i)=>({
-      x:xs[i],y:ys[i],w:widths[i],h:Math.min(rand(cfg.height[0],cfg.height[1]),Math.max(28,H-hazardDepth-12-ys[i])),
-      flowers:Math.random()<.65,joinedToNext:i<count-1&&gaps[i]===0,
-      isGreen:i===count-1,isApron:i===count-2&&gaps[i]===0,
-      approachDir:dir
-    }));
-    for(let i=0;i<count-1;i++){
-      if(Math.random()<(difficulty==='hard'?.3:.48)&&!path[i].isApron)path[i].trees=[rand(.2,.8)];
+    // Two-stage vertical transitions are easy to read and physically reachable:
+    // 1) shoot off the end of a terrace onto a small outboard ledge,
+    // 2) reverse aim to reach the long terrace above (or below).
+    for(let i=0;i<tierCount-1;i++){
+      const from=tiers[i],to=tiers[i+1];
+      const exitDir=from.dir;
+      const connectorWidth=rand(106,124);
+      const rightSide=exitDir===1;
+      const edgeFrom=rightSide?from.x+from.w:from.x;
+      const edgeTo=rightSide?to.x+to.w:to.x;
+      let stepX=rightSide?Math.max(edgeFrom,edgeTo)+rand(12,19):
+                            Math.min(edgeFrom,edgeTo)-connectorWidth-rand(12,19);
+      // Avoid the canvas frame while maintaining at least one ball-wide gap.
+      stepX=clamp(stepX,26,W-26-connectorWidth);
+      const currentExit=from.exitY;
+      const nextEntrance=to.y;
+      const stepY=lerp(currentExit,nextEntrance,rand(.45,.54));
+      const connector={x:stepX,y:stepY,w:connectorWidth,h:32,flowers:false,
+        isConnector:true,dir:-exitDir,fromTier:i,toTier:i+1};
+      platforms.push(connector);transitions.push(connector);
     }
-    // No tree or flower obstacles around the cup or on the approach apron.
-    path[count-1].flowers=false;
-    if(path[count-2].isApron){path[count-2].flowers=false;delete path[count-2].trees;}
 
-    // Extra elevated islands create the stacked silhouette of a platform game.
-    // They are real collidable platforms, not painted background scenery.
-    const extras=[];
-    if(count>=3&&Math.random()<.78){
-      const baseIndex=randInt(1,count-2),base=path[baseIndex];
-      const extraY=base.y-rand(125,175);
-      if(extraY>88){
-        const w=Math.min(rand(115,180),base.w+55);
-        const x=clamp(base.x+base.w*.5-w*.5+rand(-40,40),margin,W-margin-w);
-        extras.push({x,y:extraY,w,h:rand(34,49),isBonus:true,
-          flowers:false,scenery:'bush',ladderTo:baseIndex});
-      }
+    // A short apron can feed the ball down onto the final, *flat* green.
+    // It is a real ramp, independent of the normal-green putt collider.
+    const green=tiers[tierCount-1],greenMain=green.parts[0];
+    const finalDir=green.dir;
+    const apronW=rand(59,74),apronDrop=rand(13,20);
+    const apron=finalDir===1?{
+      x:green.x-apronW,y:green.y-apronDrop,w:apronW,h:31,dy:apronDrop,
+      isSlope:true,isApronSlope:true,flowers:false
+    }:{
+      x:green.x+green.w,y:green.y,w:apronW,h:31,dy:-apronDrop,
+      isSlope:true,isApronSlope:true,flowers:false
+    };
+    if(apron.x>22&&apron.x+apron.w<W-22){
+      // The apron must not overhang an existing main surface at this height.
+      platforms.push(apron);slopes.push(apron);
     }
-    // Optional solid crates: no crate is placed on the tee, the approach or
-    // the green, so none can trap the ball or block the final putt.
+
+    // A crate is a modest optional trick-shot obstacle, never an impassable
+    // block at the end of a terrace or on the putting green.
     const crates=[];
-    for(let i=1;i<count-1;i++){
-      const p=path[i];
-      if(!p.isApron&&p.w>145&&Math.random()<.32){
-        const size=rand(27,37);
-        crates.push({x:p.x+p.w*.58-size*.5,y:p.y-size,w:size,h:size,
+    if(difficulty!=='easy'&&Math.random()<.38){
+      const middle=tiers[Math.min(tierCount-2,1)].parts[0];
+      if(middle&&middle.w>390){
+        const size=rand(28,34);
+        crates.push({x:middle.x+middle.w*.48-size/2,y:middle.y-size,w:size,h:size,
           isCrate:true,flowers:false});
       }
     }
-    const startPlatform=path[0],green=path[count-1];
-    const startX=startPlatform.x+startPlatform.w*(dir===1?.24:.76);
-    // Cup is well inside the green, not perched at its far edge. Its landing
-    // apron and generous run-off allow an ordinary one- or two-putt finish.
-    const cupX=green.x+green.w*(dir===1?.64:.36);
-    const par=Math.max(3,count+(difficulty==='easy'?0:1));
+    platforms.push(...crates);
+
+    // Mirror the complete route after all joins and ramp directions are set.
+    if(firstDir===-1){
+      const seen=new Set();
+      for(const p of [...platforms,...tiers])if(!seen.has(p)){
+        seen.add(p);mirror(p);
+      }
+    }
+    const tee=tiers[0],cupTier=tiers[tierCount-1];
+    const teeDir=tee.dir,greenDir=cupTier.dir;
+    const startX=teeDir===1?tee.x+76:tee.x+tee.w-76;
+    const cupX=greenDir===1?cupTier.x+cupTier.w*.76:cupTier.x+cupTier.w*.24;
+    const par=difficulty==='easy'?tierCount+2:tierCount+3;
     return {
-      par,theme:themeKey,backdrop:randomBackdrop(themeKey),layout:layoutType,ballType:randomBallKey(),
-      start:{x:startX,y:startPlatform.y},cup:{x:cupX,y:green.y},
-      mainPlatforms:path,platforms:[...path,...extras,...crates]
+      par,theme:themeKey,backdrop:randomBackdrop(themeKey),layout:goingUp?'uphill':'downhill',
+      ballType:randomBallKey(),firstDirection:teeDir,tiers,transitions,slopes,
+      start:{x:startX,y:tee.y},cup:{x:cupX,y:cupTier.y},
+      mainPlatforms,platforms,greenWidth:greenMain.w
     };
   }
 
@@ -478,7 +475,7 @@
     ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.attached=null;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;ball.puttingShot=false;ball.cupPassMissed=false;
     lastSafe={x:ball.x,y:ball.y,onGreen:false,attached:null};restTimer=0;lossEffect=null;
     // Every hole starts at a true 45-degree launch angle, towards the cup.
-    const facingRight=h.cup.x>=ball.x;
+    const facingRight=(h.firstDirection||1)===1;
     angle=facingRight?-Math.PI/4:-3*Math.PI/4;
     power=0;updatePower();updateHud();
     // A clear on-screen indicator shows the opening aim, even on a phone.
@@ -709,8 +706,36 @@
     ctx.lineTo(-25,-15);ctx.closePath();ctx.fill();ctx.stroke();
     ctx.restore();
   }
+  function drawSlope(p){
+    const th=currentTheme();
+    const {x,y,w,h,dy}=p;
+    const soil=th.label==='Snowy'?'#b6c7d5':th.label==='Volcanic'?'#66565b':'#c39354';
+    const stone=th.label==='Snowy'?'#edf8fa':th.label==='Volcanic'?'#9f898a':'#f8d395';
+    const grass=p.isApronSlope?'#88d85b':th.grass2;
+    ctx.save();
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y+dy);
+    ctx.lineTo(x+w,y+dy+h);ctx.lineTo(x,y+h);ctx.closePath();
+    ctx.fillStyle=soil;ctx.fill();ctx.strokeStyle='#795b3d';ctx.lineWidth=2.2;ctx.stroke();ctx.clip();
+    ctx.strokeStyle=stone;ctx.lineWidth=5;
+    for(let yy=y+10;yy<y+Math.max(90,h+Math.abs(dy));yy+=13){
+      for(let xx=x+9;xx<x+w+9;xx+=24){
+        const v=Math.sin(xx*.17+yy*.23)*3;
+        ctx.beginPath();ctx.moveTo(xx,yy+v);ctx.lineTo(xx+12,yy+4+v);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.strokeStyle='#285f34';ctx.lineWidth=15;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y+dy);ctx.stroke();
+    ctx.strokeStyle=grass;ctx.lineWidth=9;
+    ctx.beginPath();ctx.moveTo(x,y-2);ctx.lineTo(x+w,y+dy-2);ctx.stroke();
+    ctx.restore();
+  }
+
   function drawPlatform(p){
     if(p.isCrate){drawCrate(p);return;}
+    if(p.isSlope){drawSlope(p);return;}
     const th=currentTheme(),x=p.x,y=p.y,w=p.w,h=p.h;
     const isGreen=!!p.isGreen,isApron=!!p.isApron;
     // Golden, hand-drawn stone islands with darker edges and individually
@@ -766,7 +791,7 @@
   }
 
   function cupSurfaceY(h=currentHole()){
-    const candidates=h.platforms.filter(p=>h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
+    const candidates=h.platforms.filter(p=>p.isGreen&&h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
     if(!candidates.length)return h.cup.y;
     let best=candidates[0],bestDist=Math.abs(best.y-h.cup.y);
     for(const p of candidates){const d=Math.abs(p.y-h.cup.y);if(d<bestDist){best=p;bestDist=d;}}
@@ -774,7 +799,7 @@
   }
 
   function cupPlatform(h=currentHole()){
-    const candidates=h.platforms.filter(p=>h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
+    const candidates=h.platforms.filter(p=>p.isGreen&&h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
     if(!candidates.length)return null;
     let best=candidates[0],bestDist=Math.abs(best.y-h.cup.y);
     for(const p of candidates){const d=Math.abs(p.y-h.cup.y);if(d<bestDist){best=p;bestDist=d;}}
@@ -869,21 +894,22 @@
     // Solid terraces are rendered first; ladders then bridge their actual
     // heights. They are visual route markers, not misleading extra collision.
     for(const p of h.platforms)if(!p.isCrate)drawPlatform(p);
-    for(const p of h.platforms){
-      if(!p.isBonus||p.ladderTo===undefined)continue;
-      const base=h.mainPlatforms[p.ladderTo];
-      if(!base)continue;
-      const lx=clamp(p.x+p.w*.5,base.x+21,base.x+base.w-21);
-      drawLadder(lx,p.y+p.h-7,base.y+7);
+    // Connector arrows identify where the next switchback runs. These
+    // ledges are real landings, not cosmetic ladders or invisible teleports.
+    for(const p of h.transitions){
+      drawDirectionSign(p.x+p.w*.5,p.y-7,p.dir);
     }
     for(const p of h.platforms)if(p.isCrate)drawCrate(p);
-    const first=h.mainPlatforms[0],direction=h.cup.x>h.start.x?1:-1;
-    const sx=first.x+first.w*(direction===1?.62:.38);
-    if(Math.abs(sx-h.start.x)>40)drawDirectionSign(sx,first.y-7,direction);
+    const direction=h.firstDirection;
+    const sx=h.start.x+direction*74;
+    const first=h.tiers[0];
+    if(sx>first.x+28&&sx<first.x+first.w-28)
+      drawDirectionSign(sx,first.y-7,direction);
     drawCup();drawPuttGuide();drawAim();drawBall();drawLossEffect();
   }
 
   function circleRectCollision(p){
+    if(p.isSlope)return circleSlopeCollision(p);
     const nx=clamp(ball.x,p.x,p.x+p.w),ny=clamp(ball.y,p.y,p.y+p.h),dx=ball.x-nx,dy=ball.y-ny;
     return dx*dx+dy*dy<BALL_R*BALL_R?{nx,ny,dx,dy}:null;
   }
@@ -897,7 +923,77 @@
     updateHud();
   }
 
+  function circleSlopeCollision(p){
+    const poly=[
+      [p.x,p.y], [p.x+p.w,p.y+p.dy],
+      [p.x+p.w,p.y+p.dy+p.h], [p.x,p.y+p.h]
+    ];
+    let closest=null,minDist2=Infinity;
+    for(let k=0;k<4;k++){
+      const a=poly[k],b=poly[(k+1)%4];
+      const dx=b[0]-a[0],dy=b[1]-a[1];
+      const t=clamp(((ball.x-a[0])*dx+(ball.y-a[1])*dy)/(dx*dx+dy*dy),0,1);
+      const qx=a[0]+dx*t,qy=a[1]+dy*t;
+      const d2=(ball.x-qx)**2+(ball.y-qy)**2;
+      if(d2<minDist2){minDist2=d2;
+        const L=Math.hypot(dx,dy);
+        closest={face:k,qx,qy,nx:dy/L,ny:-dx/L,d2};
+      }
+    }
+    let inside=true;
+    for(let k=0;k<4;k++){
+      const a=poly[k],b=poly[(k+1)%4];
+      if((b[0]-a[0])*(ball.y-a[1])-(b[1]-a[1])*(ball.x-a[0])<0){inside=false;break;}
+    }
+    return inside||minDist2<(BALL_R+.45)**2?closest:null;
+  }
+
+  function resolveSlope(p,prevX,prevY,hit=circleSlopeCollision(p)){
+    if(!hit)return false;
+    const {face,qx,qy,nx,ny}=hit;
+    const attachX=qx+nx*(BALL_R+.18),attachY=qy+ny*(BALL_R+.18);
+    const incoming=ball.vx*nx+ball.vy*ny;
+    const bt=currentBall();
+    // The approach ramp is part of the final green: all ball types become
+    // the ordinary white ball on TOP of it, while underside Sticky contact
+    // still behaves as Sticky until the ball reaches the grass.
+    if(face===0&&p.isApronSlope&&!ball.onGreen)activatePuttingGreen();
+    if(selectedBallType==='sticky'&&!ball.onGreen){
+      stickTo(attachX,attachY,
+        face===0?'slope':face===1?'right side':face===2?'underside':'left side');
+      return true;
+    }
+    // Position on the actual contacted polygon boundary. No tunnelling to
+    // the far side of a block, including a ramp's low end.
+    ball.x=attachX;ball.y=attachY;
+    if(face===0&&incoming<20){
+      const s=p.dy/p.w;
+      // Velocity tangent to the real grass line; gravity will add downhill
+      // acceleration below. Upright normal contact has no artificial bounce.
+      const tangent=(ball.vx+s*ball.vy)/(1+s*s);
+      const impact=Math.max(0,-incoming);
+      if(impact>300){
+        ball.vx=tangent+nx*impact*.09*bt.grassBounce;
+        ball.vy=tangent*s+ny*impact*.09*bt.grassBounce;
+        ball.grounded=false;
+      }else{
+        ball.vx=tangent;ball.vy=ball.vx*s;
+        ball.grounded=true;
+      }
+    }else{
+      // Sides and undersides reflect the incoming motion about the normal.
+      if(incoming<0){
+        const restitution=face===2?.30:.46;
+        ball.vx-=(1+restitution)*incoming*nx;
+        ball.vy-=(1+restitution)*incoming*ny;
+      }
+      ball.grounded=false;
+    }
+    return true;
+  }
+
   function resolvePlatform(p,prevX,prevY){
+    if(p.isSlope)return resolveSlope(p,prevX,prevY);
     const hit=circleRectCollision(p);if(!hit)return false;
     const wasAbove=prevY+BALL_R<=p.y+2,wasBelow=prevY-BALL_R>=p.y+p.h-2,wasLeft=prevX+BALL_R<=p.x+2,wasRight=prevX-BALL_R>=p.x+p.w-2;
     const topSupported=ball.x>=p.x+EDGE_INSET&&ball.x<=p.x+p.w-EDGE_INSET;
@@ -1186,6 +1282,19 @@
     if(ball.grounded&&!supportPlatform())ball.grounded=false;
     if(checkCup())return;
 
+    // Rolling downhill is powered by gravity along the actual ramp. The
+    // restoring normal is resolved in resolveSlope(), not by a flat ledge.
+    const restingOn=supportPlatform();
+    if(ball.grounded&&restingOn?.isSlope){
+      const s=restingOn.dy/restingOn.w;
+      const downhill=GRAVITY*bt.gravity*s/(1+s*s);
+      ball.vx+=downhill*dt;
+      ball.vx*=Math.pow(.990,dt*60);
+      ball.vy=ball.vx*s;
+      // No sleeping on a downhill ramp: keep moving until a flat landing.
+      restTimer=0;
+    }
+
     // Rolling resistance on grass, separate from impact damping.
     if(ball.grounded&&ball.vy===0){
       // Short, consistent fairway-to-green roll; the ball slows gradually.
@@ -1196,7 +1305,7 @@
     }
 
     const sp=speed();
-    if(sp<11&&ball.grounded&&supportPlatform()){
+    if(sp<11&&ball.grounded&&supportPlatform()&&!supportPlatform().isSlope){
       restTimer+=dt;
       if(restTimer>.28){
         const platform=supportPlatform();
@@ -1272,7 +1381,7 @@
     playing=false;
     endTitle.textContent='Victory!';
     finalScoreBanner.textContent=`Final score ${scoreText(totalScore)}`;
-    endSummary.textContent=`You completed all 9 holes on ${difficultySettings[selectedDifficulty].label} difficulty. The next round will generate a completely new course with mixed themes and random ball types.`;
+    endSummary.textContent=`You completed all 9 holes on ${difficultySettings[selectedDifficulty].label} difficulty. The next round will generate new switchback routes, slopes, mixed themes and random ball types.`;
     scoreGrid.innerHTML='';
     for(const r of results){const d=document.createElement('div');d.className='scorecell';d.innerHTML=`Hole ${r.hole}<strong>${r.strokes}</strong>Par ${r.par}`;scoreGrid.appendChild(d)}
     startCard.style.display='none';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='block';overlay.classList.remove('hidden');
