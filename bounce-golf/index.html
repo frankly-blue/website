@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Bounce Golf · Cartoon Islands</title>
-<meta name="bounce-golf-version" content="2026-09-23-switchback-slopes">
+<meta name="bounce-golf-version" content="2026-09-24-gentle-green-bounce">
 <style>
   :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -180,7 +180,7 @@
     </div>
     <div id="secondaryControls"><button id="resetBtn">Reset Ball</button><button id="pauseBtn">Pause</button></div>
   </div>
-  <div id="tip">Tap to aim, then hold HIT and release. Every shot uses a new random ball type and each world has its own ground physics. Sticky balls cling to solid platforms, side walls and the ceiling, but not to the green or the bottom hazard. The final island has a longer green and sometimes a connected approach. Your ball keeps its colour on the green, but every type rolls and putts with the same fair grass physics. Aim your putt towards the cup; most passes drop in, but very fast ones roll past. Each level starts at 45° towards the hole and power starts at zero. On the flat final green, putting power maps directly to distance: 50% rolls half the platform length, and 100% rolls one full platform length. Hold HIT to see an optional estimated stopping marker, then release. Underhit putts stop short; very hard putts roll past the cup and can fall off the edge. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
+  <div id="tip">Tap to aim, then hold HIT and release. Every shot uses a new random ball type and each world has its own ground physics. Sticky balls cling to solid platforms, side walls and the ceiling, but not to the green or the bottom hazard. The final island has a longer green and sometimes a connected approach. Your ball keeps its colour on the green and gives one little bounce on a proper landing before rolling normally. Every type rolls and putts with the same fair grass physics. Aim your putt towards the cup; most passes drop in, but very fast ones roll past. Each level starts at 45° towards the hole and power starts at zero. On the flat final green, putting power maps directly to distance: 50% rolls half the platform length, and 100% rolls one full platform length. Hold HIT to see an optional estimated stopping marker, then release. Underhit putts stop short; very hard putts roll past the cup and can fall off the edge. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
 </div>
 <script>
 (()=>{
@@ -309,12 +309,23 @@
   function activatePuttingGreen(){
     if(ball.onGreen)return;
     ball.onGreen=true;
+    ball.greenLandingBounceUsed=false;
     ball.puttingShot=false;
     ball.attached=null;
     // Keep the shot's ball colour and type. Only its movement switches to
     // consistent, ordinary grass physics; do not make it white or stop it.
     showMessage('On the green — let it roll, then putt!',1100);
     updateHud();
+  }
+
+  // A true airborne arrival gets ONE small, controlled hop before rolling.
+  // Every ball type uses the same green bounce, but keeps its own colour.
+  // Gentle roll-ins from the apron, stationary balls and putts do not bounce.
+  function greenLandingRebound(platform,impact){
+    if(platform!==cupPlatform()||!ball.onGreen||ball.puttingShot||
+       ball.greenLandingBounceUsed||impact<150)return 0;
+    ball.greenLandingBounceUsed=true;
+    return -clamp(impact*.30,80,140); // about 5–16 px of hop height
   }
 
   // Build a readable course from a distinct structural blueprint. Adjacent
@@ -528,7 +539,7 @@
     holeIndex=idx; if(resetStrokes)strokes=0;
     const h=currentHole();
     selectedBallType=lastPlayedBallType?randomNextBallKey(lastPlayedBallType):(h.ballType||randomBallKey());
-    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.attached=null;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;ball.puttingShot=false;ball.cupPassMissed=false;
+    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.attached=null;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;ball.greenLandingBounceUsed=false;ball.puttingShot=false;ball.cupPassMissed=false;
     lastSafe={x:ball.x,y:ball.y,onGreen:false,attached:null};restTimer=0;lossEffect=null;
     // Every hole starts at a true 45-degree launch angle, towards the cup.
     const facingRight=(h.firstDirection||1)===1;
@@ -1125,7 +1136,10 @@
     if(wasAbove&&topSupported){
       const impact=Math.abs(ball.vy);
       ball.y=p.y-BALL_R;
-      if(impact>300)ball.vy=-impact*.20*groundBounce;
+      const greenHop=greenLandingRebound(p,impact);
+      if(greenHop)ball.vy=greenHop;
+      else if(p===cupPlatform()&&ball.onGreen)ball.vy=0; // settle after the single hop
+      else if(impact>300)ball.vy=-impact*.20*groundBounce;
       else if(impact>185)ball.vy=-impact*.11*groundBounce;
       else ball.vy=0;
       if(Math.abs(ball.vy)<18)ball.vy=0;
@@ -1143,7 +1157,8 @@
       if(penY<penX){
         if(ball.y<p.y&&topSupported){
           const impact=Math.abs(ball.vy);ball.y=p.y-BALL_R;
-          ball.vy=impact>260?-impact*.16*groundBounce:0;
+          const greenHop=greenLandingRebound(p,impact);
+          ball.vy=greenHop||(p===cupPlatform()&&ball.onGreen?0:impact>260?-impact*.16*groundBounce:0);
           if(Math.abs(ball.vy)<18)ball.vy=0;
           const steadyGreenRoll=ball.onGreen&&p===cupPlatform()&&impact<30&&
             Math.abs(prevY+BALL_R-p.y)<3;
