@@ -123,7 +123,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
-        <p>Nine different course designs every round: long switchbacks, broken bridges, stepping islands, descending terraces and short rolling slopes. Each hole also changes theme and ball type.</p>
+        <p>Nine different course designs every round: long switchbacks, broken bridges, stepping islands, descending terraces and short rolling slopes. Each hole changes theme, and every shot gives you a different ball type.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
           <button class="diffBtn" data-difficulty="easy">Easy</button>
@@ -180,7 +180,7 @@
     </div>
     <div id="secondaryControls"><button id="resetBtn">Reset Ball</button><button id="pauseBtn">Pause</button></div>
   </div>
-  <div id="tip">Tap to aim, then hold HIT and release. Each hole starts with a random ball and its own ground physics. Sticky balls cling to any solid platform or screen wall, but not the bottom hazard. The final island has a longer green and sometimes a connected approach. Landing on the green turns your ball white without stopping its roll; once it settles, use a gentle putt towards the cup. Each level starts at 45° towards the hole and power starts at zero. On the flat final green, putting power maps directly to distance: 50% rolls half the platform length, and 100% rolls one full platform length. Hold HIT to see an optional estimated stopping marker, then release. Underhit putts stop short; overhit putts roll past the cup and can fall off the edge. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
+  <div id="tip">Tap to aim, then hold HIT and release. Every shot uses a new random ball type and each world has its own ground physics. Sticky balls cling to solid platforms, side walls and the ceiling, but not to the green or the bottom hazard. The final island has a longer green and sometimes a connected approach. Your ball keeps its colour on the green, but every type rolls and putts with the same fair grass physics. Aim your putt towards the cup; most passes drop in, but very fast ones roll past. Each level starts at 45° towards the hole and power starts at zero. On the flat final green, putting power maps directly to distance: 50% rolls half the platform length, and 100% rolls one full platform length. Hold HIT to see an optional estimated stopping marker, then release. Underhit putts stop short; very hard putts roll past the cup and can fall off the edge. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
 </div>
 <script>
 (()=>{
@@ -212,7 +212,7 @@
   let angle=-Math.PI/4,power=0,charging=false,chargeStart=0,chargeRAF=null;
   let lastTime=performance.now(),restTimer=0,lastSafe={x:0,y:0,onGreen:false,attached:null};
   let selectedDifficulty='medium';
-  let selectedBallType='standard',choosingBall=false,lossEffect=null,guideEnabled=true,wasPuttingMode=false;
+  let selectedBallType='standard',lastPlayedBallType=null,choosingBall=false,lossEffect=null,guideEnabled=true,wasPuttingMode=false;
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const rand=(a,b)=>a+Math.random()*(b-a);
@@ -245,6 +245,12 @@
   const ballKeys=Object.keys(ballTypes);
   const shuffle=a=>{const arr=[...a];for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;};
   const randomBallKey=()=>ballKeys[randInt(0,ballKeys.length-1)];
+  // Choose the next shot's ball from the other three types. Never repeat
+  // the type used for the preceding shot, even when the ball is on the green.
+  const randomNextBallKey=previous=>{
+    const choices=ballKeys.filter(key=>key!==previous);
+    return choices[randInt(0,choices.length-1)];
+  };
   const currentTheme=(h=currentHole())=>themes[h?.theme||'classic'];
 
   const backdropChoices={
@@ -283,7 +289,7 @@
   const GREEN_ROLL_DECAY=.991; // Landing-roll physics (before the first putt).
   const GREEN_REST_SPEED=11;
   const PUTT_DECELERATION=360; // Pixels per second squared.
-  const PUTT_CUP_MAX_SPEED=112; // The ball must reach the cup gently.
+  const PUTT_CUP_MAX_SPEED=235; // Ordinary rolls drop; only very fast passes skip the cup.
   const PUTT_CUP_RADIUS=9; // Smaller than the drawn cup; no magnetic suction.
   const greenSurface={surface:'Putting green',groundBounce:.14,landingGrip:1,rollDecay:.998,puttSpeed:1,wallBounce:1,cupCatch:1.25};
   function supportPlatform(x=ball.x,y=ball.y){
@@ -299,14 +305,14 @@
     })||null;
   }
   const onGreenPlatform=()=>ball.onGreen&&supportPlatform()===cupPlatform();
-  const surfacePhysics=()=>onGreenPlatform()?greenSurface:currentTheme();
+  const surfacePhysics=()=>ball.onGreen&&(onGreenPlatform()||supportPlatform()?.isApronSlope)?greenSurface:currentTheme();
   function activatePuttingGreen(){
     if(ball.onGreen)return;
     ball.onGreen=true;
     ball.puttingShot=false;
     ball.attached=null;
-    selectedBallType='standard'; // The random ball is used until the putting green.
-    // Preserve incoming momentum: landing on the green is a roll, not a teleport or hard stop.
+    // Keep the shot's ball colour and type. Only its movement switches to
+    // consistent, ordinary grass physics; do not make it white or stop it.
     showMessage('On the green — let it roll, then putt!',1100);
     updateHud();
   }
@@ -505,14 +511,23 @@
 
   const currentHole=()=>holes[holeIndex];
   const currentBall=()=>ballTypes[selectedBallType];
+  // On the green every ball MOVES like Standard but retains its own artwork.
+  const movementBall=()=>ball.onGreen?ballTypes.standard:currentBall();
   const speed=()=>Math.hypot(ball.vx,ball.vy);
+  function prepareNextShot(message='Ready for next shot'){
+    // Call only after a shot has finished: the ball remains visually the same
+    // during flight and roll, then changes to a different type for the next hit.
+    selectedBallType=randomNextBallKey(lastPlayedBallType||selectedBallType);
+    showMessage(`${currentBall().label} ball · ${message}`,950);
+    updateHud();
+  }
   const scoreText=n=>n===0?'E':n>0?'+'+n:String(n);
   function showMessage(t,ms=1000){message.textContent=t;message.classList.add('show');clearTimeout(showMessage.t);showMessage.t=setTimeout(()=>message.classList.remove('show'),ms)}
 
   function loadHole(idx,resetStrokes=true){
     holeIndex=idx; if(resetStrokes)strokes=0;
     const h=currentHole();
-    selectedBallType=h.ballType||randomBallKey();
+    selectedBallType=lastPlayedBallType?randomNextBallKey(lastPlayedBallType):(h.ballType||randomBallKey());
     ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.attached=null;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;ball.puttingShot=false;ball.cupPassMissed=false;
     lastSafe={x:ball.x,y:ball.y,onGreen:false,attached:null};restTimer=0;lossEffect=null;
     // Every hole starts at a true 45-degree launch angle, towards the cup.
@@ -532,7 +547,7 @@
     const deg=Math.round(Math.atan2(-Math.sin(angle),Math.abs(Math.cos(angle)))*180/Math.PI);
     dirHud.textContent=!ball.moving?`Aim ${deg}° ${Math.cos(angle)<0?'←':'→'}`:
       h.cup.y<ball.y?'Goal ↑':h.cup.y>ball.y?'Goal ↓':'Goal →';
-    ballHud.textContent=ball.onGreen?`Ball Standard · Green`:ball.attached?`Sticky · Stuck (${ball.attached})`:`Ball ${currentBall().label} · ${currentTheme().label}`;
+    ballHud.textContent=`Ball ${currentBall().label}${ball.onGreen?' · Green':ball.attached?` · Stuck (${ball.attached})`:` · ${currentTheme().label}`}`;
     dirHud.title=onGreenPlatform()?'Normal putting green':currentTheme().surface;
     updateControlMode();
     updatePower();
@@ -982,8 +997,7 @@
     ball.moving=false;ball.grounded=face==='top';ball.attached=face;
     restTimer=0;
     lastSafe={x,y,onGreen:false,attached:face};
-    showMessage(`Sticky ball stuck to ${face}! Aim and hit again`,1150);
-    updateHud();
+    prepareNextShot(`Stuck to ${face} · aim and hit`);
   }
 
   function circleSlopeCollision(p){
@@ -1016,11 +1030,10 @@
     const {face,qx,qy,nx,ny}=hit;
     const attachX=qx+nx*(BALL_R+.18),attachY=qy+ny*(BALL_R+.18);
     const incoming=ball.vx*nx+ball.vy*ny;
-    const bt=currentBall();
-    // The approach ramp is part of the final green: all ball types become
-    // the ordinary white ball on TOP of it, while underside Sticky contact
-    // still behaves as Sticky until the ball reaches the grass.
+    // The apron is part of the green. Sticky stops sticking here, but it
+    // stays visibly green and rolls with normal ball physics like every type.
     if(face===0&&p.isApronSlope&&!ball.onGreen)activatePuttingGreen();
+    const bt=movementBall();
     if(selectedBallType==='sticky'&&!ball.onGreen){
       stickTo(attachX,attachY,
         face===0?'slope':face===1?'right side':face===2?'underside':'left side');
@@ -1069,7 +1082,7 @@
 
     // A sticky ball adheres to every solid platform face, including sides and
     // undersides, without falling away. The cup's top is the exception: it
-    // switches to a standard white putting ball before this check.
+    // rolls like a standard ball without changing its appearance.
     if(selectedBallType==='sticky'&&!ball.onGreen){
       let face;
       if(wasAbove&&ball.vy>=0)face='top';
@@ -1088,10 +1101,8 @@
       const safeX=clamp(ball.x,p.x+BALL_R*.35,p.x+p.w-BALL_R*.35);
       const safeY=clamp(ball.y,p.y+BALL_R*.35,p.y+p.h-BALL_R*.35);
       if(face==='top'&&p===cupPlatform()){
-        // Landing on the cup island turns even a corner-catching Sticky ball
-        // into a regular playable putting ball, never a stuck green ball.
-        // Sticky turns into a standard ball here and keeps rolling with a
-        // softened version of its incoming horizontal momentum.
+        // Sticky keeps its green colour, but releases into normal rolling
+        // physics when it reaches the cup platform.
         const rollIn=clamp(ball.vx*.58,-260,260);
         ball.x=safeX;ball.y=p.y-BALL_R;ball.vx=rollIn;ball.vy=0;
         ball.grounded=true;ball.moving=Math.abs(rollIn)>5;ball.attached=null;
@@ -1107,7 +1118,7 @@
       return true;
     }
 
-    const bt=currentBall(),sf=surfacePhysics();
+    const bt=movementBall(),sf=surfacePhysics();
     const groundBounce=bt.grassBounce*sf.groundBounce;
     const landingGrip=bt.landingGrip*sf.landingGrip;
     const wallBounce=bt.wallBounce*sf.wallBounce;
@@ -1168,15 +1179,15 @@
     const onSurface=ball.y+BALL_R>=surfaceY-3&&ball.y<=surfaceY+5;
     // The cup has a real speed limit. An overhit putt rolls straight past,
     // without magnetic suction or an automatic stop at the hole.
-    const catchSpeed=ball.onGreen?34:currentBall().cupSpeed; // Incoming, non-putted rolls.
-    const catchRadius=ball.onGreen?14:14;
+    const catchSpeed=ball.onGreen?PUTT_CUP_MAX_SPEED:currentBall().cupSpeed;
+    const catchRadius=15; // Catch normal passes without magnetic suction.
     if(cupDistance<catchRadius&&onSurface&&Math.abs(ball.vy)<65){
       // Judge speed on FIRST entering the cup area. Otherwise an overhit
       // ball can travel beyond the centre, slow down, and get pulled back
       // into the cup from its far edge. A missed fast pass stays missed
       // for the rest of this stroke; the next putt can try again.
       if(ball.cupPassMissed)return false;
-      if(speed()>=catchSpeed){ball.cupPassMissed=true;return false;}
+      if(speed()>catchSpeed){ball.cupPassMissed=true;return false;}
       return sinkInCup();
     }
     return false;
@@ -1191,8 +1202,8 @@
     setTimeout(()=>{
       if(!playing)return;
       ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=lastSafe.attached==='top'||!!lastSafe.onGreen;ball.attached=lastSafe.attached||null;ball.lost=false;ball.cupPassMissed=false;restTimer=0;
-      ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;selectedBallType=ball.onGreen?'standard':currentHole().ballType;
-      showMessage('Play again from the last spot',750);updateHud();
+      ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;
+      prepareNextShot('Play again from the last spot');
     },700);
   }
 
@@ -1219,8 +1230,8 @@
 
       for(const p of currentHole().platforms){
         if(resolvePlatform(p,prevX,prevY)){
-          // Every platform face catches Sticky. On the cup's top, it
-          // instead becomes the ordinary putting ball as before.
+          // Every platform face catches Sticky, except a green top;
+          // there it retains its colour and begins an ordinary grass roll.
           if(ball.attached||ball.onGreen||!ball.moving)return;
         }
       }
@@ -1242,7 +1253,7 @@
     if(!dir){
       ball.puttingShot=false;ball.moving=false;ball.grounded=true;
       lastSafe={x:ball.x,y:ball.y,onGreen:true,attached:null};
-      updateHud();return;
+      prepareNextShot('Ready for next putt');return;
     }
     const v0=Math.abs(ball.vx);
     const travelTime=Math.min(dt,v0/PUTT_DECELERATION);
@@ -1275,7 +1286,7 @@
       ball.x=nextX;ball.vx=ball.vy=0;ball.moving=false;
       ball.grounded=true;ball.puttingShot=false;restTimer=0;
       lastSafe={x:ball.x,y:ball.y,onGreen:true,attached:null};
-      showMessage('Ready for next putt',700);updateHud();
+      prepareNextShot('Ready for next putt');
     }
   }
 
@@ -1305,7 +1316,7 @@
   function physicsStep(dt){
     const prevX=ball.x,prevY=ball.y;
     ball.grounded=false;
-    const bt=currentBall(),sf=surfacePhysics();
+    const bt=movementBall(),sf=surfacePhysics();
     ball.vy+=GRAVITY*bt.gravity*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
     ball.vx*=Math.pow(AIR_DRAG,dt*60);
 
@@ -1378,7 +1389,7 @@
         ball.y=platform.y-BALL_R;
         ball.vx=ball.vy=0;ball.moving=false;ball.attached=null;
         lastSafe={x:ball.x,y:ball.y,onGreen:onGreenPlatform(),attached:null};
-        showMessage('Ready for next shot',650);updateHud();
+        prepareNextShot('Ready for next shot');
       }
     }else restTimer=0;
   }
@@ -1389,6 +1400,7 @@
     if(power<2){power=0;updatePower();showMessage('Hold HIT to build power',650);return;}
     const putting=puttingMode();
     strokes++;
+    lastPlayedBallType=selectedBallType;
     ball.cupPassMissed=false;
     if(putting){
       // On the cup platform every shot is a horizontal distance-controlled putt.
@@ -1444,7 +1456,7 @@
     playing=false;
     endTitle.textContent='Victory!';
     finalScoreBanner.textContent=`Final score ${scoreText(totalScore)}`;
-    endSummary.textContent=`You completed all 9 holes on ${difficultySettings[selectedDifficulty].label} difficulty. The next round will reshuffle all nine distinct routes, slopes, scenery and random ball types.`;
+    endSummary.textContent=`You completed all 9 holes on ${difficultySettings[selectedDifficulty].label} difficulty. The next round reshuffles all nine routes, slopes and scenery, with a different ball type for every shot.`;
     scoreGrid.innerHTML='';
     for(const r of results){const d=document.createElement('div');d.className='scorecell';d.innerHTML=`Hole ${r.hole}<strong>${r.strokes}</strong>Par ${r.par}`;scoreGrid.appendChild(d)}
     startCard.style.display='none';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='block';overlay.classList.remove('hidden');
@@ -1462,7 +1474,7 @@
 
   function startGame(){
     holes=generateCourse(selectedDifficulty);
-    results=[];totalScore=0;holeIndex=0;playing=true;paused=false;selectedBallType='standard';
+    results=[];totalScore=0;holeIndex=0;playing=true;paused=false;lastPlayedBallType=null;selectedBallType='standard';
     startCard.style.display='none';ballCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
     overlay.classList.add('hidden');
     loadHole(0,true);
@@ -1471,7 +1483,7 @@
 
   function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
 
-  function resetBall(){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.attached=lastSafe.attached||null;ball.grounded=ball.attached==='top'||!!lastSafe.onGreen;ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;selectedBallType=ball.onGreen?'standard':currentHole().ballType;showMessage('Ball reset',600);updateHud()}
+  function resetBall(){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.attached=lastSafe.attached||null;ball.grounded=ball.attached==='top'||!!lastSafe.onGreen;ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;showMessage('Ball reset',600);updateHud()}
   function adjustAngle(delta){
     if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
     if(puttingMode()){
