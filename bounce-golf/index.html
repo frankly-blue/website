@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Bounce Golf · Wild Landscapes</title>
-<meta name="bounce-golf-version" content="2026-09-25-wild-landscapes-v1">
+<meta name="bounce-golf-version" content="2026-09-25-natural-roll-v2">
 <style>
   :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -123,6 +123,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
+        <div style="font-size:12px;font-weight:800;color:#437253;margin:-3px 0 10px">Natural Roll v2</div>
         <p>Nine varied landscapes every round: winding ridges, deep valleys, floating meadows, stepping stones and short rolling slopes. Each hole changes theme, and every shot gives you a different ball type.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
@@ -310,7 +311,7 @@
   // v(t) exactly ensures the preview and the actual roll agree at any FPS.
   // v^2 = 2 * friction * travel; power maps LINEARLY to distance, not speed.
   const AIR_DRAG=.998;
-  const GREEN_ROLL_DECAY=.991; // Landing-roll physics (before the first putt).
+  const GREEN_ROLL_DECAY=.982; // Shorter natural green landing roll; deliberate putts use their separate calibrated model.
   const GREEN_REST_SPEED=11;
   const PUTT_DECELERATION=360; // Pixels per second squared.
   const PUTT_CUP_MAX_SPEED=235; // Ordinary rolls drop; only very fast passes skip the cup.
@@ -1297,13 +1298,20 @@
   }
 
   const terrainCenterY=point=>point.y-BALL_R*Math.hypot(1,point.slope);
-  function terrainRollFriction(){
-    if(ball.onGreen)return 28;
-    const surface=currentTheme().surface;
-    if(surface==='Slippery snow')return 15;
-    if(surface==='Soft sand')return 66;
-    if(surface==='Grippy jungle turf')return 43;
-    return 31;
+  // Terrain rolling is deliberately separate from airborne gravity and
+  // distance-calibrated putts. Real grass has rolling resistance AND speed-
+  // dependent drag; otherwise every descent builds up more momentum than it
+  // loses on the next climb and the ball roams around the hole indefinitely.
+  function terrainRollingResistance(){
+    if(ball.onGreen)return {kinetic:95,static:128,drag:2.6,restSpeed:4.5};
+    switch(currentTheme().surface){
+      case 'Slippery snow':return {kinetic:50,static:82,drag:1.9,restSpeed:4.2};
+      case 'Soft sand':return {kinetic:148,static:182,drag:4.2,restSpeed:5.8};
+      case 'Grippy jungle turf':return {kinetic:115,static:158,drag:3.3,restSpeed:5.0};
+      case 'Leafy turf':return {kinetic:94,static:132,drag:2.7,restSpeed:4.7};
+      case 'Hard volcanic rock':return {kinetic:83,static:112,drag:2.4,restSpeed:4.2};
+      default:return {kinetic:91,static:132,drag:2.7,restSpeed:4.6};
+    }
   }
 
   function settleTerrainBall(g,point){
@@ -1340,20 +1348,21 @@
       const length=Math.hypot(1,at.slope);
       let v=Number.isFinite(ball.rollSpeed)?ball.rollSpeed:ball.vx*length;
       const drive=GRAVITY*movementBall().gravity*at.slope/(1.4*length);
-      const friction=terrainRollFriction();
-      const resistance= v!==0 ? Math.sign(v)*friction :
-        (Math.abs(drive)>friction?Math.sign(drive)*friction:drive);
-      let next=v+(drive-resistance)*step;
-      // Static rolling resistance holds the ball at the bottom of a hollow;
-      // stronger gravity reverses it gradually rather than changing direction
-      // in a single collision frame.
-      if(v!==0&&Math.sign(next)!==Math.sign(v)&&Math.abs(drive)<=friction){next=0;}
-      if(v!==0&&Math.sign(next)!==Math.sign(v)&&Math.abs(drive)>friction){
-        next=(drive-Math.sign(drive)*friction)*step;
+      const roll=terrainRollingResistance();
+      // Static friction prevents creeping or endless tiny reversals at the
+      // bottom of a dip; kinetic friction slows a genuinely moving ball.
+      let next;
+      if(Math.abs(v)<roll.restSpeed && Math.abs(drive)<=roll.static){
+        next=0;
+      }else{
+        const kineticDirection=Math.abs(v)>roll.restSpeed?Math.sign(v):Math.sign(drive);
+        const acceleration=drive-kineticDirection*roll.kinetic;
+        next=(v+acceleration*step)*Math.exp(-roll.drag*step);
+        // Never let numerical integration reverse a slowing ball on a gentle
+        // slope. If the hill is steep enough it can reverse naturally later.
+        if(Math.abs(drive)<=roll.static && v*next<0)next=0;
+        if(Math.abs(next)<roll.restSpeed && Math.abs(drive)<=roll.static)next=0;
       }
-      // Small continuous rolling drag removes energy without sticky-frame
-      // friction jumps as the slope changes around a valley.
-      next*=Math.exp(-(ball.onGreen?.86:1.04)*step);
       next=clamp(next,-MAX_SPEED,MAX_SPEED);
       const avg=(v+next)*.5;
       const nextX=ball.x+avg/length*step;
@@ -1378,7 +1387,7 @@
         ball.rollGroup=null;ball.rollSpeed=null;launchBouncePad(p);return true;
       }
       if(checkCup())return true;
-      if(Math.abs(next)<.6&&Math.abs(drive)<=friction){
+      if(next===0&&Math.abs(drive)<=roll.static){
         restTimer+=step;
         if(restTimer>.22){settleTerrainBall(g,nextPoint);return true;}
       }else restTimer=0;
