@@ -328,6 +328,50 @@
     return -clamp(impact*.30,80,140); // about 5–16 px of hop height
   }
 
+
+  function addBouncePad(p){
+    if(!p||p.isSlope||p.isGreen||p.isCrate)return;
+    const padW=Math.max(40,Math.min(58,p.w-18));
+    p.bouncePad={rel:clamp(rand(.30,.70),.22,.78),w:padW,power:rand(330,405)};
+    p.bouncePad.x=p.x+p.w*p.bouncePad.rel;
+  }
+
+  function onBouncePad(p,x=ball.x){
+    return !!(p&&p.bouncePad&&x>=p.bouncePad.x-p.bouncePad.w*.5&&x<=p.bouncePad.x+p.bouncePad.w*.5);
+  }
+
+  function addAlternativeRoute(platforms,from,to){
+    const steps=Math.random()<.55?2:1;
+    const innerLeft=Math.max(from.x,to.x)+28;
+    const innerRight=Math.min(from.x+from.w,to.x+to.w)-28;
+    if(innerRight-innerLeft<110)return [];
+    const span=innerRight-innerLeft;
+    const made=[];
+    for(let s=0;s<steps;s++){
+      const t=(s+1)/(steps+1);
+      const w=rand(80,122);
+      const x=clamp(innerLeft+span*t-w*.5+rand(-15,15),innerLeft,innerRight-w);
+      const y=lerp(from.exitY,to.y,t)+rand(-8,8)-14;
+      const p={x,y,w,h:24,flowers:false,isAltRoute:true,trees:[],dir:from.dir};
+      made.push(p);
+    }
+    if(made.length)made[made.length-1].routeHint=true;
+    platforms.push(...made);
+    return made;
+  }
+
+  function launchBouncePad(p){
+    const dir=Math.abs(ball.vx)>20?Math.sign(ball.vx):(p.dir||1);
+    const boost=(p.bouncePad?.power)||360;
+    ball.x=clamp(ball.x,p.x+BALL_R,p.x+p.w-BALL_R);
+    ball.y=p.y-BALL_R;
+    ball.attached=null; ball.grounded=false; ball.moving=true;
+    ball.vy=-boost;
+    ball.vx=clamp(ball.vx*.62 + dir*boost*.19,-280,280);
+    restTimer=0;
+    showMessage('Bounce pad!',550);
+  }
+
   // Build a readable course from a distinct structural blueprint. Adjacent
   // terraces have aligned exit/entry ends, with real outboard stepping ledges.
   // All mirrored platforms share the same colliders as their rendered artwork.
@@ -378,6 +422,8 @@
       p.x=W-p.x-p.w;
       if(p.dir)p.dir=-p.dir;
       if(p.isSlope){p.y+=p.dy;p.dy=-p.dy;}
+      if(p.bouncePad)p.bouncePad.x=W-p.bouncePad.x;
+      if(p.baseX!=null)p.baseX=W-p.baseX-p.w;
     };
     const platforms=[],mainPlatforms=[],slopes=[],transitions=[];
     for(let i=0;i<tierCount;i++){
@@ -457,6 +503,7 @@
 
     // Optional intermediate landing islands alter the jumping route and the
     // silhouette without replacing the main back-and-forth progression.
+    const featurePlatforms=[];
     for(let i=0;i<Math.min(template.bonus,tierCount-1);i++){
       const from=tiers[i],to=tiers[i+1];
       const width=rand(93,153);
@@ -466,7 +513,28 @@
       if(platforms.every(p=>p.isCrate||extra.x+extra.w<p.x-12||extra.x>p.x+p.w+12||
          extra.y+extra.h<p.y-19||extra.y>p.y+p.h+19)){
         platforms.push(extra);
+        featurePlatforms.push(extra);
       }
+    }
+
+    // Alternative routes: extra stepping platforms provide a safer or shorter
+    // path between selected tiers without replacing the main switchback route.
+    const altRoutes=[];
+    for(let i=0;i<tierCount-1;i++){
+      if(Math.random()<.62){
+        const route=addAlternativeRoute(platforms,tiers[i],tiers[i+1]);
+        if(route.length)altRoutes.push(...route);
+      }
+    }
+    featurePlatforms.push(...altRoutes);
+
+    // Bounce pads and moving platforms make individual holes feel distinct.
+    const bounceCandidates=shuffle(platforms.filter(p=>!p.isSlope&&!p.isGreen&&!p.isCrate&&!p.isApronSlope&&p.w>78&&p.h<=30));
+    for(const p of bounceCandidates.slice(0,randInt(1,2)))addBouncePad(p);
+    const movingCandidates=shuffle(platforms.filter(p=>(p.isConnector||p.isBonus||p.isAltRoute)&&!p.isGreen&&!p.isCrate&&!p.isSlope));
+    for(const p of movingCandidates.slice(0,Math.min(2,movingCandidates.length))){
+      p.motion={axis:Math.random()<.65?'x':'y',amp:Math.random()<.65?rand(18,34):rand(14,22),speed:rand(.85,1.35)};
+      p.baseX=p.x; p.baseY=p.y; p.prevX=p.x; p.prevY=p.y;
     }
 
     // The approach is a short sloping run-in, the cup is always on a level
@@ -521,6 +589,35 @@
   }
 
   const currentHole=()=>holes[holeIndex];
+
+  function initDynamicPlatforms(h=currentHole()){
+    if(!h||!h.platforms)return;
+    for(const p of h.platforms){
+      if(!p.motion)continue;
+      p.baseX ??= p.x; p.baseY ??= p.y;
+      p.prevX = p.x; p.prevY = p.y;
+      p.motion.phase ??= rand(0,Math.PI*2);
+    }
+  }
+
+  function updateMovingPlatforms(dt){
+    const h=currentHole(); if(!h||!h.platforms)return;
+    const support=(!ball.moving&&!ball.attached&&!ball.lost&&!ball.sinking&&!ball.holed)?supportPlatform():null;
+    const now=performance.now()/1000;
+    for(const p of h.platforms){
+      if(!p.motion)continue;
+      p.prevX=p.x; p.prevY=p.y;
+      const t=now*(p.motion.speed||1)+(p.motion.phase||0);
+      p.x=p.baseX+(p.motion.axis==='x'?Math.sin(t)*(p.motion.amp||0):0);
+      p.y=p.baseY+(p.motion.axis==='y'?Math.sin(t)*(p.motion.amp||0):0);
+      if(p.bouncePad)p.bouncePad.x=p.x+p.w*(p.bouncePad.rel||.5);
+      if(support===p){
+        const dx=p.x-p.prevX,dy=p.y-p.prevY;
+        ball.x+=dx; ball.y+=dy;
+        lastSafe.x+=dx; lastSafe.y+=dy;
+      }
+    }
+  }
   const currentBall=()=>ballTypes[selectedBallType];
   // On the green every ball MOVES like Standard but retains its own artwork.
   const movementBall=()=>ball.onGreen?ballTypes.standard:currentBall();
@@ -545,6 +642,7 @@
     const facingRight=(h.firstDirection||1)===1;
     angle=facingRight?-Math.PI/4:-3*Math.PI/4;
     power=0;updatePower();updateHud();
+    initDynamicPlatforms(h);
     // A clear on-screen indicator shows the opening aim, even on a phone.
     dirHud.textContent=facingRight?'Aim 45° ↗':'Aim 45° ↖';
   }
@@ -858,6 +956,32 @@
     if(p.trees){for(const f of p.trees)drawTree(x+w*f,y-8,w>220?.65:.53);}
     else if(!isGreen&&w>145&&!p.isApron&&((Math.floor(x+y)%3)!==0))drawBush(x+w*.72,y-7,.42);
     if(p.isBonus)drawBush(x+w*.32,y-8,.44);
+    if(p.bouncePad){
+      const cx=p.bouncePad.x,pw=p.bouncePad.w,py=y-9;
+      ctx.save();
+      ctx.fillStyle='#3e5cff';ctx.strokeStyle='#1930a3';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.roundRect(cx-pw/2,py,pw,12,5);ctx.fill();ctx.stroke();
+      ctx.strokeStyle='#fff8c9';ctx.lineWidth=2;
+      for(let sx=cx-pw/2+10;sx<cx+pw/2-8;sx+=12){ctx.beginPath();ctx.moveTo(sx,py+11);ctx.lineTo(sx+4,py+3);ctx.lineTo(sx+8,py+11);ctx.stroke();}
+      ctx.restore();
+    }
+    if(p.motion){
+      ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.fillStyle='rgba(77,151,255,.95)';ctx.lineWidth=2.2;
+      const my=y-18,mx=x+w*.5;
+      if(p.motion.axis==='x'){
+        ctx.beginPath();ctx.moveTo(mx-18,my);ctx.lineTo(mx+18,my);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(mx-18,my);ctx.lineTo(mx-10,my-5);ctx.lineTo(mx-10,my+5);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(mx+18,my);ctx.lineTo(mx+10,my-5);ctx.lineTo(mx+10,my+5);ctx.closePath();ctx.fill();
+      }else{
+        ctx.beginPath();ctx.moveTo(mx,my-10);ctx.lineTo(mx,my+10);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(mx,my-10);ctx.lineTo(mx-5,my-2);ctx.lineTo(mx+5,my-2);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(mx,my+10);ctx.lineTo(mx-5,my+2);ctx.lineTo(mx+5,my+2);ctx.closePath();ctx.fill();
+      }
+      ctx.restore();
+    }
+    if(p.isAltRoute&&!p.motion){
+      ctx.save();ctx.fillStyle='rgba(255,255,255,.9)';ctx.beginPath();ctx.arc(x+w*.5,y-16,5,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
     if(p.flowers&&!p.isApron){
       const count=Math.min(3,Math.max(1,Math.floor(w/95)));
       for(let i=0;i<count;i++)drawFlower(x+24+i*(w-48)/Math.max(1,count-1),y-7,i+Math.floor(x));
@@ -1090,6 +1214,11 @@
     if(selectedBallType!=='sticky'&&!topSupported&&
        ball.y<p.y+BALL_R*.70&&prevY<=p.y+BALL_R)return false;
     if(p===cupPlatform()&&topSupported&&fallingOntoTop&&ball.y<=p.y+BALL_R*.5)activatePuttingGreen();
+
+    if(topSupported&&fallingOntoTop&&onBouncePad(p,ball.x)&&!ball.onGreen){
+      launchBouncePad(p);
+      return true;
+    }
 
     // A sticky ball adheres to every solid platform face, including sides and
     // undersides, without falling away. The cup's top is the exception: it
@@ -1493,7 +1622,7 @@
     startCard.style.display='none';ballCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
     overlay.classList.add('hidden');
     loadHole(0,true);
-    showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball`,1800);
+    showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball · pads / movers / route splits`,2100);
   }
 
   function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
@@ -1544,8 +1673,8 @@
     }
   });
 
-  function frame(t){const dt=Math.min(.025,(t-lastTime)/1000);lastTime=t;physics(dt);draw();requestAnimationFrame(frame)}
-  holes=generateCourse(selectedDifficulty);setDifficulty(selectedDifficulty);loadHole(0,true);draw();requestAnimationFrame(frame);
+  function frame(t){const dt=Math.min(.025,(t-lastTime)/1000);lastTime=t;updateMovingPlatforms(dt);physics(dt);draw();requestAnimationFrame(frame)}
+  holes=generateCourse(selectedDifficulty);setDifficulty(selectedDifficulty);loadHole(0,true);initDynamicPlatforms();draw();requestAnimationFrame(frame);
 })();
 </script>
 </body>
