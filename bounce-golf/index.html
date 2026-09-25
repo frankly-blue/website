@@ -208,7 +208,7 @@
   let holes=[];
 
   let holeIndex=0,strokes=0,totalScore=0,results=[],playing=false,paused=false;
-  let ball={x:0,y:0,vx:0,vy:0,moving:false,grounded:false,rollGroup:null,rollReversals:0,lastRollDirection:0,
+  let ball={x:0,y:0,vx:0,vy:0,moving:false,grounded:false,rollGroup:null,rollSpeed:null,rollReversals:0,lastRollDirection:0,
     ignoreTerrainGroup:null,ignoreTerrainTime:0,attached:null,lost:false,sinking:false,holed:false,onGreen:false,puttingShot:false,sinkStart:0,sinkSurfaceY:0};
   let angle=-Math.PI/4,power=0,charging=false,chargeStart=0,chargeRAF=null;
   let lastTime=performance.now(),restTimer=0,lastSafe={x:0,y:0,onGreen:false,attached:null};
@@ -389,7 +389,7 @@
     const boost=(p.bouncePad?.power)||360;
     ball.x=clamp(ball.x,p.x+BALL_R,p.x+p.w-BALL_R);
     ball.y=p.y-BALL_R;
-    ball.attached=null; ball.rollGroup=null;ball.rollReversals=0;ball.lastRollDirection=0;
+    ball.attached=null; ball.rollGroup=null;ball.rollSpeed=null;ball.rollReversals=0;ball.lastRollDirection=0;
     ball.ignoreTerrainGroup=null;ball.ignoreTerrainTime=0;
     ball.grounded=false; ball.moving=true;
     ball.vy=-boost;
@@ -778,7 +778,7 @@
     holeIndex=idx; if(resetStrokes)strokes=0;
     const h=currentHole();
     selectedBallType=lastPlayedBallType?randomNextBallKey(lastPlayedBallType):(h.ballType||randomBallKey());
-    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.rollGroup=0;ball.rollReversals=0;ball.lastRollDirection=0;
+    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.rollGroup=0;ball.rollSpeed=0;ball.rollReversals=0;ball.lastRollDirection=0;
     ball.ignoreTerrainGroup=null;ball.ignoreTerrainTime=0;ball.attached=null;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;ball.greenLandingBounceUsed=false;ball.puttingShot=false;ball.cupPassMissed=false;
     lastSafe={x:ball.x,y:ball.y,onGreen:false,attached:null,rollGroup:0};restTimer=0;lossEffect=null;
     // Every hole starts at a true 45-degree launch angle, towards the cup.
@@ -1273,58 +1273,45 @@
     return inside||minDist2<(BALL_R+.45)**2?closest:null;
   }
 
-  function terrainPieceAt(g,x){
-    // Adjacent curve pieces share exact endpoints; prefer the piece in the
-    // direction of travel on a seam rather than an adjacent cliff side.
-    const pieces=g.pieces;
-    return pieces.find(p=>x>=p.x-.02&&x<=p.x+p.w+.02)||null;
-  }
-
-  function terrainPointAt(g,x){
-    const p=terrainPieceAt(g,x);
-    if(!p)return null;
-    const slope=p.isSlope?p.dy/p.w:0;
-    return {p,slope,y:p.y+slope*clamp(x-p.x,0,p.w)};
-  }
-
-  function nearbyValley(g,x){
-    // Find real local low points from adjacent terrain colliders. The physics
-    // is not allowed to alternate indefinitely between the two sides of a
-    // valley once the remaining rolling speed is negligible.
-    const pieces=g.pieces;
-    for(let i=0;i<pieces.length-1;i++){
-      const left=pieces[i],right=pieces[i+1];
-      const join=left.x+left.w;
-      if(Math.abs(right.x-join)>1.5||Math.abs(join-x)>12)continue;
-      const a=left.isSlope?left.dy/left.w:0;
-      const b=right.isSlope?right.dy/right.w:0;
-      if(a>.018&&b<-.018){
-        return {x:join,y:left.y+(left.dy||0)};
-      }
+  // Drawn terrain consists of sampled points. Interpolate their heights and
+  // normals continuously instead of stepping between the collision polygons.
+  // Otherwise each 15px terrain seam produces a visible normal/velocity snap.
+  function smoothTerrain(g,x){
+    const pts=g.points;
+    const xx=clamp(x,pts[0].x,pts[pts.length-1].x);
+    let low=0,high=pts.length-2;
+    while(low<high){
+      const mid=(low+high)>>1;
+      if(pts[mid+1].x<xx)low=mid+1;else high=mid;
     }
-    return null;
+    const i=low,a=pts[i],b=pts[i+1],width=Math.max(.001,b.x-a.x);
+    const before=pts[Math.max(0,i-1)],after=pts[Math.min(pts.length-1,i+2)];
+    const m0=(b.y-before.y)/Math.max(.001,b.x-before.x);
+    const m1=(after.y-a.y)/Math.max(.001,after.x-a.x);
+    const t=clamp((xx-a.x)/width,0,1),t2=t*t,t3=t2*t;
+    const y=(2*t3-3*t2+1)*a.y+(t3-2*t2+t)*width*m0+
+      (-2*t3+3*t2)*b.y+(t3-t2)*width*m1;
+    const slope=((6*t2-6*t)*a.y+(3*t2-4*t+1)*width*m0+
+      (-6*t2+6*t)*b.y+(3*t2-2*t)*width*m1)/width;
+    return {x:xx,y,slope};
   }
 
+  const terrainCenterY=point=>point.y-BALL_R*Math.hypot(1,point.slope);
   function terrainRollFriction(){
-    const theme=currentTheme();
-    let base;
-    if(ball.onGreen)base=42;
-    else if(theme.surface==='Slippery snow')base=22;
-    else if(theme.surface==='Soft sand')base=84;
-    else{
-      const bt=movementBall();
-      base=clamp(43+(1-bt.rollDecay)*600,40,72);
-    }
-    // Rolling grass dissipates energy. If a ball repeatedly reverses in a
-    // hollow, slightly increased resistance prevents endless oscillation.
-    return base*(1+Math.min(2,ball.rollReversals*.33));
+    if(ball.onGreen)return 28;
+    const surface=currentTheme().surface;
+    if(surface==='Slippery snow')return 15;
+    if(surface==='Soft sand')return 66;
+    if(surface==='Grippy jungle turf')return 43;
+    return 31;
   }
 
   function settleTerrainBall(g,point){
-    ball.rollGroup=g.id;
+    ball.rollGroup=g.id;ball.rollSpeed=0;
     ball.rollReversals=0;ball.lastRollDirection=0;
     ball.x=clamp(ball.x,g.x+EDGE_INSET,g.x+g.w-EDGE_INSET);
-    ball.y=point.y-BALL_R*Math.hypot(1,point.slope);
+    const surface=smoothTerrain(g,ball.x);
+    ball.y=terrainCenterY(surface);
     ball.vx=ball.vy=0;ball.grounded=true;ball.moving=false;
     ball.attached=null;restTimer=0;
     lastSafe={x:ball.x,y:ball.y,onGreen:ball.onGreen,
@@ -1332,99 +1319,102 @@
     prepareNextShot(ball.onGreen?'Ready for next putt':'Ready for next shot');
   }
 
+  function leaveTerrain(g,arcSpeed,point,atX){
+    const length=Math.hypot(1,point.slope);
+    ball.x=atX;
+    ball.y=terrainCenterY(point)+(atX-point.x)*point.slope;
+    ball.vx=arcSpeed/length;
+    ball.vy=ball.vx*point.slope;
+    ball.rollGroup=null;ball.rollSpeed=null;
+    ball.grounded=false;restTimer=0;
+    // Prevent a curved cliff lip from instantly re-catching the ball.
+    ball.ignoreTerrainGroup=g.id;ball.ignoreTerrainTime=.15;
+  }
+
   function rollOnTerrain(dt){
-    // The entire landmass is one surface for rolling. Running each tiny
-    // collider through the airborne physics caused seam jitter and loops.
     const g=currentHole().terrainGroups?.find(group=>group.id===ball.rollGroup);
-    if(!g){ball.rollGroup=null;ball.grounded=false;return false;}
-    const steps=Math.max(1,Math.ceil(dt/(1/120))),step=dt/steps;
+    if(!g){ball.rollGroup=null;ball.rollSpeed=null;ball.grounded=false;return false;}
+    const steps=Math.max(1,Math.ceil(dt/(1/180))),step=dt/steps;
     for(let i=0;i<steps;i++){
-      const here=terrainPointAt(g,ball.x);
-      if(!here){
-        // Already beyond the edge: release the group immediately and skip
-        // its nearby side colliders briefly so they cannot reattach the ball
-        // to the same lip on every frame.
-        ball.rollGroup=null;ball.grounded=false;
-        ball.ignoreTerrainGroup=g.id;ball.ignoreTerrainTime=.26;
-        return true;
-      }
-      // A nearly stationary ball at the bottom of a curved hollow must come
-      // to rest instead of endlessly reversing at an invisible seam.
-      const basin=Math.abs(ball.vx)<12?nearbyValley(g,ball.x):null;
-      if(basin){
-        const bottom=terrainPointAt(g,basin.x)||here;
-        ball.x=basin.x;
-        ball.y=bottom.y-BALL_R*Math.hypot(1,bottom.slope);
-        ball.vx=ball.vy=0;ball.grounded=true;
-        restTimer+=step;
-        if(restTimer>.20){settleTerrainBall(g,bottom);return true;}
-        continue;
-      }
+      const at=smoothTerrain(g,ball.x);
+      const length=Math.hypot(1,at.slope);
+      let v=Number.isFinite(ball.rollSpeed)?ball.rollSpeed:ball.vx*length;
+      const drive=GRAVITY*movementBall().gravity*at.slope/(1.4*length);
       const friction=terrainRollFriction();
-      const gravity=GRAVITY*movementBall().gravity;
-      const gradient=here.slope;
-      // A solid golf ball rolls with rotational inertia (roughly 1.4m),
-      // so the horizontal acceleration is g*slope / 1.4(1+slope²).
-      const downhill=gravity*gradient/(1.4*(1+gradient*gradient));
-      const previous=ball.vx;
-      let next=previous;
-      if(Math.abs(previous)<2&&Math.abs(downhill)<=friction+5){
-        next=0;
-      }else{
-        const resistance=previous===0?0:Math.sign(previous)*friction;
-        next=previous+(downhill-resistance)*step;
-        if(previous!==0&&Math.sign(next)!==Math.sign(previous)){
-          // A ball that runs out of energy on an incline turns around only
-          // when gravity is strong enough; otherwise static friction holds it.
-          next=Math.abs(downhill)>friction+5?
-            (downhill-Math.sign(downhill)*friction)*step:0;
-        }
+      const resistance= v!==0 ? Math.sign(v)*friction :
+        (Math.abs(drive)>friction?Math.sign(drive)*friction:drive);
+      let next=v+(drive-resistance)*step;
+      // Static rolling resistance holds the ball at the bottom of a hollow;
+      // stronger gravity reverses it gradually rather than changing direction
+      // in a single collision frame.
+      if(v!==0&&Math.sign(next)!==Math.sign(v)&&Math.abs(drive)<=friction){next=0;}
+      if(v!==0&&Math.sign(next)!==Math.sign(v)&&Math.abs(drive)>friction){
+        next=(drive-Math.sign(drive)*friction)*step;
       }
+      // Small continuous rolling drag removes energy without sticky-frame
+      // friction jumps as the slope changes around a valley.
+      next*=Math.exp(-(ball.onGreen?.86:1.04)*step);
       next=clamp(next,-MAX_SPEED,MAX_SPEED);
-      const nextX=ball.x+(previous+next)*.5*step;
-      const fallingOff=nextX<g.x+EDGE_INSET||nextX>g.x+g.w-EDGE_INSET;
-      if(fallingOff){
-        // Carry momentum off the actual lip. Never wrap to another segment.
-        const lip=clamp(nextX,g.x+EDGE_INSET,g.x+g.w-EDGE_INSET);
-        const edge=terrainPointAt(g,lip)||here;
-        ball.x=nextX;
-        ball.y=edge.y+(nextX-lip)*edge.slope-BALL_R*Math.hypot(1,edge.slope);
-        ball.vx=next;ball.vy=next*edge.slope;
-        ball.rollGroup=null;ball.grounded=false;restTimer=0;
-        ball.ignoreTerrainGroup=g.id;ball.ignoreTerrainTime=.26;
+      const avg=(v+next)*.5;
+      const nextX=ball.x+avg/length*step;
+      if(nextX<g.x+EDGE_INSET||nextX>g.x+g.w-EDGE_INSET){
+        const lipX=clamp(nextX,g.x+EDGE_INSET,g.x+g.w-EDGE_INSET);
+        leaveTerrain(g,next,smoothTerrain(g,lipX),nextX);
         return true;
       }
-      const at=terrainPointAt(g,nextX);
-      if(!at){
-        ball.rollGroup=null;ball.grounded=false;
-        ball.ignoreTerrainGroup=g.id;ball.ignoreTerrainTime=.26;
-        return true;
-      }
-      // No change in height at a seam except the actual curve's gradient.
-      ball.x=nextX;
-      ball.y=at.y-BALL_R*Math.hypot(1,at.slope);
-      // Keep the actual velocity ALONG the curved surface continuous when
-      // its local tangent changes across a polygon join.
-      const tangentSpeed=next*Math.hypot(1,gradient);
-      ball.vx=tangentSpeed/Math.hypot(1,at.slope);
-      ball.vy=ball.vx*at.slope;
+      const nextPoint=smoothTerrain(g,nextX);
+      ball.x=nextX;ball.y=terrainCenterY(nextPoint);
+      ball.rollSpeed=next;
+      const nextLength=Math.hypot(1,nextPoint.slope);
+      ball.vx=next/nextLength;
+      ball.vy=ball.vx*nextPoint.slope;
       ball.grounded=true;
-      const direction=Math.abs(ball.vx)>5?Math.sign(ball.vx):0;
-      if(direction&&ball.lastRollDirection&&direction!==ball.lastRollDirection)
-        ball.rollReversals++;
-      if(direction)ball.lastRollDirection=direction;
-      if((at.p.isApronSlope||at.p.isGreen)&&!ball.onGreen)
-        activatePuttingGreen();
-      if(at.p.bouncePad&&onBouncePad(at.p,nextX)&&!ball.onGreen){
-        ball.rollGroup=null;launchBouncePad(at.p);return true;
+
+      // Use the containing polygon only for features, not for the rolling
+      // position or normal. This removes collider seam jitter completely.
+      const p=g.pieces.find(q=>ball.x>=q.x-.1&&ball.x<=q.x+q.w+.1);
+      if(p?.isApronSlope||p?.isGreen){if(!ball.onGreen)activatePuttingGreen();}
+      if(p?.bouncePad&&onBouncePad(p,ball.x)&&!ball.onGreen){
+        ball.rollGroup=null;ball.rollSpeed=null;launchBouncePad(p);return true;
       }
       if(checkCup())return true;
-      if(next===0&&Math.abs(downhill)<=friction+5){
+      if(Math.abs(next)<.6&&Math.abs(drive)<=friction){
         restTimer+=step;
-        if(restTimer>.22){settleTerrainBall(g,at);return true;}
+        if(restTimer>.22){settleTerrainBall(g,nextPoint);return true;}
       }else restTimer=0;
     }
     return true;
+  }
+
+  // One top surface per entire landmass. Landings use the smooth surface,
+  // so contact at the border of two tiny rock colliders cannot snap sideways.
+  function landOnSmoothTerrain(prevX,prevY){
+    if(selectedBallType==='sticky'&&!ball.onGreen)return false;
+    for(const g of currentHole().terrainGroups||[]){
+      if(g.id===ball.ignoreTerrainGroup&&ball.ignoreTerrainTime>0)continue;
+      if(ball.x<g.x+EDGE_INSET||ball.x>g.x+g.w-EDGE_INSET||
+         prevX<g.x+EDGE_INSET||prevX>g.x+g.w-EDGE_INSET)continue;
+      const at=smoothTerrain(g,ball.x),prev=smoothTerrain(g,prevX);
+      const target=terrainCenterY(at),priorTarget=terrainCenterY(prev);
+      const into=ball.vy-ball.vx*at.slope;
+      if(prevY>priorTarget+4||ball.y<target-.9||
+         ball.y>target+BALL_R*.9||into<-.01)continue;
+      const p=g.pieces.find(q=>ball.x>=q.x-.1&&ball.x<=q.x+q.w+.1);
+      if(p?.bouncePad&&onBouncePad(p,ball.x)&&!ball.onGreen){launchBouncePad(p);return true;}
+      if(p?.isGreen||p?.isApronSlope){if(!ball.onGreen)activatePuttingGreen();}
+      const impact=Math.max(0,into/Math.hypot(1,at.slope));
+      const hop=p?.isGreen?greenLandingRebound(p,impact):0;
+      // Preserve the old small green hop only on genuine airborne arrivals.
+      if(hop){ball.y=target;ball.vy=hop;ball.vx*=.93;ball.grounded=false;return true;}
+      const tangent=(ball.vx+at.slope*ball.vy)/Math.hypot(1,at.slope);
+      ball.rollGroup=g.id;ball.rollSpeed=tangent;ball.grounded=true;
+      ball.x=at.x;ball.y=target;
+      ball.vx=tangent/Math.hypot(1,at.slope);
+      ball.vy=ball.vx*at.slope;
+      restTimer=0;
+      return true;
+    }
+    return false;
   }
 
   function resolveSlope(p,prevX,prevY,hit=circleSlopeCollision(p)){
@@ -1469,7 +1459,13 @@
         ball.vx=tangent;ball.vy=ball.vx*s;
         ball.grounded=true;
         if(p.terrainSegment){
-          if(ball.rollGroup!==p.terrainGroup){ball.rollReversals=0;ball.lastRollDirection=0;}
+          const g=currentHole().terrainGroups?.find(g=>g.id===p.terrainGroup);
+          if(g){
+            const smooth=smoothTerrain(g,ball.x),length=Math.hypot(1,smooth.slope);
+            ball.rollSpeed=ball.vx*length;
+            ball.y=terrainCenterY(smooth);
+            ball.vx=ball.rollSpeed/length;ball.vy=ball.vx*smooth.slope;
+          }
           ball.rollGroup=p.terrainGroup;
         }
       }
@@ -1561,7 +1557,7 @@
       if(!steadyGreenRoll)ball.vx*=(impact>240?.91:.96)*landingGrip;
       ball.grounded=ball.vy===0;
       if(ball.grounded&&p.terrainSegment){
-        if(ball.rollGroup!==p.terrainGroup){ball.rollReversals=0;ball.lastRollDirection=0;}
+        if(ball.rollGroup!==p.terrainGroup){ball.rollSpeed=null;}
         ball.rollGroup=p.terrainGroup;
       }
     }
@@ -1582,7 +1578,7 @@
           if(!steadyGreenRoll)ball.vx*=.95*landingGrip;
           ball.grounded=ball.vy===0;
           if(ball.grounded&&p.terrainSegment){
-            if(ball.rollGroup!==p.terrainGroup){ball.rollReversals=0;ball.lastRollDirection=0;}
+            if(ball.rollGroup!==p.terrainGroup){ball.rollSpeed=null;}
             ball.rollGroup=p.terrainGroup;
           }
         }else if(ball.y>=p.y){ball.y=p.y+p.h+BALL_R;ball.vy=Math.abs(ball.vy)*.36*wallBounce;}
@@ -1600,7 +1596,7 @@
   function sinkInCup(){
     if(ball.sinking||ball.lost||ball.holed)return false;
     const h=currentHole();
-    ball.puttingShot=false;ball.rollGroup=null;ball.x=h.cup.x;ball.y=cupSurfaceY(h)-BALL_R;
+    ball.puttingShot=false;ball.rollGroup=null;ball.rollSpeed=null;ball.x=h.cup.x;ball.y=cupSurfaceY(h)-BALL_R;
     ball.vx=ball.vy=0;ball.moving=false;ball.grounded=false;
     ball.sinking=true;ball.sinkStart=performance.now();ball.sinkSurfaceY=cupSurfaceY(h);
     showMessage('In the hole!',700);
@@ -1633,11 +1629,11 @@
     if(ball.lost||ball.sinking||ball.holed)return;
     const th=currentTheme();
     lossEffect={kind:th.hazardKind,x:clamp(ball.x,34,W-34),y:H-th.hazardDepth+8,start:performance.now(),color:th.effectColor};
-    ball.lost=true;ball.moving=true;ball.rollGroup=null;ball.attached=null;ball.vx=ball.vy=0;
+    ball.lost=true;ball.moving=true;ball.rollGroup=null;ball.rollSpeed=null;ball.attached=null;ball.vx=ball.vy=0;
     showMessage(th.lossText,950);
     setTimeout(()=>{
       if(!playing)return;
-      ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.moving=false;ball.rollGroup=lastSafe.rollGroup??null;ball.grounded=lastSafe.attached==='top'||!!lastSafe.onGreen||ball.rollGroup!==null;ball.attached=lastSafe.attached||null;ball.lost=false;ball.cupPassMissed=false;restTimer=0;
+      ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.moving=false;ball.rollGroup=lastSafe.rollGroup??null;ball.rollSpeed=0;ball.grounded=lastSafe.attached==='top'||!!lastSafe.onGreen||ball.rollGroup!==null;ball.attached=lastSafe.attached||null;ball.lost=false;ball.cupPassMissed=false;restTimer=0;
       ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;
       prepareNextShot('Play again from the last spot');
     },700);
@@ -1750,6 +1746,11 @@
     for(let i=0;i<steps;i++){
       physicsStep(step);
       if(!ball.moving||ball.lost||ball.holed||ball.sinking||paused)return;
+      if(ball.rollGroup!==null){
+        const remainder=step*(steps-i-1);
+        if(remainder>0)rollOnTerrain(remainder);
+        return;
+      }
     }
   }
 
@@ -1780,6 +1781,10 @@
       ball.y=BALL_R+8;ball.vy=Math.abs(ball.vy)*.62*bt.wallBounce*sf.wallBounce;
     }
 
+    if(landOnSmoothTerrain(prevX,prevY)){
+      checkCup();
+      return;
+    }
     const colliding=currentHole().platforms
       .filter(p=>circleRectCollision(p))
       .sort((a,b)=>{
@@ -1840,6 +1845,11 @@
         }else ball.y=platform.y-BALL_R;
         ball.vx=ball.vy=0;ball.moving=false;ball.attached=null;
         ball.rollGroup=platform.terrainSegment?platform.terrainGroup:null;
+        ball.rollSpeed=0;
+        if(ball.rollGroup!==null){
+          const group=currentHole().terrainGroups.find(g=>g.id===ball.rollGroup);
+          if(group)ball.y=terrainCenterY(smoothTerrain(group,ball.x));
+        }
         lastSafe={x:ball.x,y:ball.y,onGreen:onGreenPlatform(),attached:null,rollGroup:ball.rollGroup};
         prepareNextShot('Ready for next shot');
       }
@@ -1854,7 +1864,7 @@
     strokes++;
     lastPlayedBallType=selectedBallType;
     ball.cupPassMissed=false;
-    ball.rollGroup=null;ball.rollReversals=0;ball.lastRollDirection=0;
+    ball.rollGroup=null;ball.rollSpeed=null;ball.rollReversals=0;ball.lastRollDirection=0;
     ball.ignoreTerrainTime=0;ball.ignoreTerrainGroup=null;
     if(putting){
       // On the cup platform every shot is a horizontal distance-controlled putt.
@@ -1937,7 +1947,7 @@
 
   function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
 
-  function resetBall(){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.rollGroup=lastSafe.rollGroup??null;ball.attached=lastSafe.attached||null;ball.grounded=ball.attached==='top'||!!lastSafe.onGreen;ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;showMessage('Ball reset',600);updateHud()}
+  function resetBall(){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.rollGroup=lastSafe.rollGroup??null;ball.rollSpeed=0;ball.attached=lastSafe.attached||null;ball.grounded=ball.attached==='top'||!!lastSafe.onGreen;ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;showMessage('Ball reset',600);updateHud()}
   function adjustAngle(delta){
     if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
     if(puttingMode()){
