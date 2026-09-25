@@ -200,7 +200,7 @@
   const difficultyBtns=[...document.querySelectorAll('.diffBtn')];
   const ballBtns=[...document.querySelectorAll('.ballBtn')];
 
-  const GRAVITY=620, BALL_R=10;
+  const GRAVITY=760, BALL_R=10;
   // A ball can only rest on grass when its centre is properly above the island.
   // Corner contact on its own is not enough to suspend an ordinary ball.
   const EDGE_INSET=3;
@@ -226,9 +226,9 @@
   };
 
   const ballTypes={
-    standard:{label:'Standard',color:'#ffffff',stroke:'#c7d0cc',gravity:1,launch:1,grassBounce:1,wallBounce:1,landingGrip:1,rollDecay:.986,putt:1,cupSpeed:165},
-    heavy:{label:'Heavy',color:'#5f6670',stroke:'#3f454d',gravity:1.28,launch:.88,grassBounce:.45,wallBounce:.82,landingGrip:.96,rollDecay:.982,putt:.93,cupSpeed:150},
-    bouncy:{label:'Bouncy',color:'#ff8a2a',stroke:'#c75f0e',gravity:.90,launch:1.03,grassBounce:1.85,wallBounce:1.28,landingGrip:1,rollDecay:.989,putt:1.08,cupSpeed:138},
+    standard:{label:'Standard',color:'#ffffff',stroke:'#c7d0cc',gravity:1,launch:1,grassBounce:.82,wallBounce:.92,landingGrip:1,rollDecay:.987,putt:1,cupSpeed:165},
+    heavy:{label:'Heavy',color:'#5f6670',stroke:'#3f454d',gravity:1.32,launch:.88,grassBounce:.30,wallBounce:.70,landingGrip:.97,rollDecay:.983,putt:.93,cupSpeed:150},
+    bouncy:{label:'Bouncy',color:'#ff8a2a',stroke:'#c75f0e',gravity:.94,launch:1.03,grassBounce:1.45,wallBounce:1.18,landingGrip:1,rollDecay:.989,putt:1.08,cupSpeed:138},
     sticky:{label:'Sticky',color:'#62b84f',stroke:'#397c31',gravity:1,launch:.97,grassBounce:.12,wallBounce:.76,landingGrip:.68,rollDecay:.955,putt:.78,cupSpeed:190}
   };
 
@@ -265,15 +265,15 @@
   // not just direction, but number of floors, terrace spans, jump gaps,
   // stepping ledges, broken bridges, and slope position.
   const layoutTemplates=[
-    {key:'grandClimb',name:'Grand Climb',up:true,land:3,portrait:4,span:.91,rights:[757,742],lefts:[195,212],start:33,end:910,bonus:0,split:-1,ramps:'late',progress3:[0,.50,1],progress4:[0,.30,.68,1]},
-    {key:'brokenBridge',name:'Broken Bridge',up:true,land:4,portrait:5,span:.84,rights:[700,769],lefts:[276,196],start:70,end:866,bonus:2,split:1,ramps:'mixed',progress4:[0,.24,.69,1],progress5:[0,.19,.42,.70,1]},
-    {key:'highRoad',name:'High Road',up:false,land:3,portrait:4,span:.75,rights:[763,687],lefts:[187,235],start:48,end:913,bonus:1,split:-1,ramps:'early',progress3:[0,.64,1],progress4:[0,.40,.67,1]},
-    {key:'narrowPass',name:'Narrow Pass',up:true,land:4,portrait:5,span:.87,rights:[661,715],lefts:[249,259],start:95,end:852,bonus:1,split:2,ramps:'sparse',progress4:[0,.29,.56,1],progress5:[0,.24,.45,.70,1]},
-    {key:'threeSteps',name:'Three Steps',up:false,land:3,portrait:4,span:.66,rights:[716,736],lefts:[239,200],start:42,end:886,bonus:1,split:-1,ramps:'mixed',progress3:[0,.37,1],progress4:[0,.23,.58,1]},
-    {key:'longRun',name:'Long Run',up:true,land:3,portrait:4,span:.70,rights:[773,750],lefts:[178,183],start:31,end:924,bonus:0,split:-1,ramps:'early',progress3:[0,.56,1],progress4:[0,.34,.73,1]},
-    {key:'canyonCrossing',name:'Canyon Crossing',up:false,land:4,portrait:5,span:.89,rights:[655,769],lefts:[280,194],start:88,end:912,bonus:2,split:1,ramps:'mixed',progress4:[0,.25,.52,1],progress5:[0,.18,.41,.75,1]},
-    {key:'skyLedges',name:'Sky Ledges',up:true,land:4,portrait:5,span:.83,rights:[734,690],lefts:[188,271],start:49,end:878,bonus:2,split:-1,ramps:'sparse',progress4:[0,.40,.66,1],progress5:[0,.30,.48,.74,1]},
-    {key:'rollingRidge',name:'Rolling Ridge',up:false,land:3,portrait:4,span:.72,rights:[692,764],lefts:[218,231],start:61,end:925,bonus:1,split:-1,ramps:'early',progress3:[0,.48,1],progress4:[0,.31,.73,1]}
+    {key:'grandClimb',name:'Cloud Climb',up:true,land:3,portrait:4,span:.91,rights:[757,742],lefts:[195,212],start:33,end:910,bonus:0,split:-1,ramps:'late',progress3:[0,.50,1],progress4:[0,.30,.68,1]},
+    {key:'brokenBridge',name:'Winding Bridge',up:true,land:4,portrait:5,span:.84,rights:[700,769],lefts:[276,196],start:70,end:866,bonus:2,split:1,ramps:'mixed',progress4:[0,.24,.69,1],progress5:[0,.19,.42,.70,1]},
+    {key:'highRoad',name:'Curved High Road',up:false,land:3,portrait:4,span:.75,rights:[763,687],lefts:[187,235],start:48,end:913,bonus:1,split:-1,ramps:'early',progress3:[0,.64,1],progress4:[0,.40,.67,1]},
+    {key:'narrowPass',name:'Sky Pass',up:true,land:4,portrait:5,span:.87,rights:[661,715],lefts:[249,259],start:95,end:852,bonus:1,split:2,ramps:'sparse',progress4:[0,.29,.56,1],progress5:[0,.24,.45,.70,1]},
+    {key:'threeSteps',name:'Rolling Steps',up:false,land:3,portrait:4,span:.66,rights:[716,736],lefts:[239,200],start:42,end:886,bonus:1,split:-1,ramps:'mixed',progress3:[0,.37,1],progress4:[0,.23,.58,1]},
+    {key:'longRun',name:'Long Sweep',up:true,land:3,portrait:4,span:.70,rights:[773,750],lefts:[178,183],start:31,end:924,bonus:0,split:-1,ramps:'early',progress3:[0,.56,1],progress4:[0,.34,.73,1]},
+    {key:'canyonCrossing',name:'Curvy Crossing',up:false,land:4,portrait:5,span:.89,rights:[655,769],lefts:[280,194],start:88,end:912,bonus:2,split:1,ramps:'mixed',progress4:[0,.25,.52,1],progress5:[0,.18,.41,.75,1]},
+    {key:'skyLedges',name:'Sky Garden',up:true,land:4,portrait:5,span:.83,rights:[734,690],lefts:[188,271],start:49,end:878,bonus:2,split:-1,ramps:'sparse',progress4:[0,.40,.66,1],progress5:[0,.30,.48,.74,1]},
+    {key:'rollingRidge',name:'Bending Ridge',up:false,land:3,portrait:4,span:.72,rights:[692,764],lefts:[218,231],start:61,end:925,bonus:1,split:-1,ramps:'early',progress3:[0,.48,1],progress4:[0,.31,.73,1]}
   ];
   const layoutTypes=layoutTemplates.map(t=>t.key);
   const randomBackdrop=themeKey=>{
@@ -372,6 +372,78 @@
     showMessage('Bounce pad!',550);
   }
 
+  function partSurfaceY(part,x){
+    if(part.isSlope)return part.y + part.dy*((x-part.x)/part.w);
+    return part.y;
+  }
+
+  function buildCurvyTierParts(tier,isGreen){
+    const rockHeight=rand(34,46);
+    if(isGreen){
+      return {parts:[{x:tier.x,y:tier.y,w:tier.w,h:rockHeight,isGreen:true,dir:tier.dir,flowers:false,ordinal:tier.ordinal}],
+        startY:tier.y,exitY:tier.y};
+    }
+    const shape=shuffle(['wave','ridge','terrace','swoop','basin'])[0];
+    const parts=[];
+    let cursor=tier.x, currentY=tier.y;
+    const pushFlat=(w,y=currentY,extra={})=>{w=Math.max(44,w); parts.push({x:cursor,y,w,h:rockHeight,dir:tier.dir,flowers:false,ordinal:tier.ordinal,...extra}); cursor+=w; currentY=y;};
+    const pushSlope=(w,dy,extra={})=>{w=Math.max(38,w); parts.push({x:cursor,y:currentY,w,h:rockHeight,dy,isSlope:true,dir:tier.dir,flowers:false,ordinal:tier.ordinal,...extra}); cursor+=w; currentY+=dy;};
+    const w=tier.w;
+    const remain=()=>tier.x+tier.w-cursor;
+    if(shape==='wave'){
+      pushFlat(w*.18);
+      pushSlope(w*.18,rand(18,30));
+      pushFlat(w*.18,currentY);
+      pushSlope(w*.18,-rand(12,24));
+      pushFlat(remain());
+    }else if(shape==='ridge'){
+      pushFlat(w*.12);
+      pushSlope(w*.22,-rand(16,28));
+      pushFlat(w*.18,currentY);
+      pushSlope(w*.20,rand(16,28));
+      pushFlat(remain());
+    }else if(shape==='terrace'){
+      pushFlat(w*.22);
+      pushSlope(w*.11,rand(12,22));
+      pushFlat(w*.20,currentY);
+      pushSlope(w*.11,-rand(10,18));
+      pushFlat(remain());
+    }else if(shape==='swoop'){
+      pushFlat(w*.10);
+      pushSlope(w*.26,rand(22,34));
+      pushFlat(w*.10,currentY);
+      pushSlope(w*.21,-rand(10,22));
+      pushFlat(remain());
+    }else{ // basin
+      pushFlat(w*.16);
+      pushSlope(w*.15,rand(14,24));
+      pushFlat(w*.16,currentY);
+      pushSlope(w*.15,-rand(14,24));
+      pushFlat(remain());
+    }
+    // Light cleanup and organic width variation
+    for(const part of parts){
+      if(part.w<40)part.w=40;
+    }
+    // Mirror profile when the playing direction moves right-to-left.
+    if(tier.dir===-1){
+      for(const part of parts){
+        part.x=tier.x+tier.w-(part.x-tier.x)-part.w;
+        if(part.isSlope){part.y+=part.dy;part.dy=-part.dy;}
+      }
+      parts.sort((a,b)=>a.x-b.x);
+    }
+    const startProbe=tier.dir===1?tier.x+Math.min(52,tier.w*.18):tier.x+tier.w-Math.min(52,tier.w*.18);
+    const exitProbe=tier.dir===1?tier.x+tier.w-4:tier.x+4;
+    let startY=tier.y,exitY=tier.y;
+    for(const part of parts){
+      if(startProbe>=part.x&&startProbe<=part.x+part.w)startY=partSurfaceY(part,startProbe);
+      if(exitProbe>=part.x&&exitProbe<=part.x+part.w)exitY=partSurfaceY(part,clamp(exitProbe,part.x,part.x+part.w));
+    }
+    return {parts,startY,exitY};
+  }
+
+
   // Build a readable course from a distinct structural blueprint. Adjacent
   // terraces have aligned exit/entry ends, with real outboard stepping ledges.
   // All mirrored platforms share the same colliders as their rendered artwork.
@@ -429,61 +501,28 @@
     for(let i=0;i<tierCount;i++){
       const tier=tiers[i];
       const isGreen=i===tierCount-1;
-      const dir=tier.dir;
-      const rockHeight=rand(33,44);
-      // Different blueprints place their genuine gravity-driven down ramps
-      // near the entrance, at the exit, or leave selected decks flat.
-      const mode=template.ramps;
-      const useSlope=!isGreen&&i!==template.split&&(
-        i===0||mode==='early'||mode==='late'||
-        (mode==='mixed'?i%2===0:Math.random()<.50));
-      const rampW=useSlope?rand(56,82):0;
-      const rampDrop=useSlope?rand(15,27):0;
-      const early=mode==='early'||(mode==='mixed'&&i%2===1);
-      const runout=useSlope?(early?Math.min(tier.w*.40,rand(152,245)):rand(59,93)):0;
-      const flatW=tier.w-rampW-runout;
-      let parts;
-      if(!useSlope){
-        parts=[{x:tier.x,y:tier.y,w:tier.w,h:rockHeight,
-          isGreen,dir,flowers:false,ordinal:i}];
-      }else if(dir===1){
-        parts=[
-          {x:tier.x,y:tier.y,w:flatW,h:rockHeight,dir,flowers:false,ordinal:i},
-          {x:tier.x+flatW,y:tier.y,w:rampW,h:rockHeight,dy:rampDrop,
-            isSlope:true,dir,flowers:false,ordinal:i},
-          {x:tier.x+flatW+rampW,y:tier.y+rampDrop,w:runout,h:rockHeight,
-            dir,flowers:false,ordinal:i}
-        ];
-      }else{
-        parts=[
-          {x:tier.x+rampW+runout,y:tier.y,w:flatW,h:rockHeight,dir,flowers:false,ordinal:i},
-          {x:tier.x+runout,y:tier.y+rampDrop,w:rampW,h:rockHeight,dy:-rampDrop,
-            isSlope:true,dir,flowers:false,ordinal:i},
-          {x:tier.x,y:tier.y+rampDrop,w:runout,h:rockHeight,dir,flowers:false,ordinal:i}
-        ];
-      }
-      // Broken bridges really have a playable gap. Only a middle tier is
-      // split, never the tee or the flat final green.
+      const built=buildCurvyTierParts(tier,isGreen);
+      let parts=built.parts;
+      // Broken bridges still appear, but only on a broad flat run.
       if(!isGreen&&i===template.split){
         const j=parts.reduce((best,p,k)=>!p.isSlope&&p.w>parts[best].w?k:best,0);
         const target=parts[j];
         const gap=difficulty==='easy'?rand(27,38):difficulty==='hard'?rand(56,76):rand(39,55);
-        if(!target.isSlope&&target.w>gap+240){
-          const leftW=(target.w-gap)*rand(.44,.56);
+        if(!target.isSlope&&target.w>gap+210){
+          const leftW=(target.w-gap)*rand(.42,.58);
           parts.splice(j,1,
             {...target,w:leftW},
             {...target,x:target.x+leftW+gap,w:target.w-leftW-gap});
         }
       }
-      const scenic=parts.find(p=>!p.isSlope&&p.w>180);
-      if(scenic&&!isGreen&&Math.random()<.75){
-        scenic.trees=[dir===1?.20:.80];
-      }
+      const scenic=parts.filter(p=>!p.isSlope).sort((a,b)=>b.w-a.w)[0];
+      if(scenic&&!isGreen&&Math.random()<.82)scenic.trees=[tier.dir===1?.18:.82];
       platforms.push(...parts);
       mainPlatforms.push(...parts);
       parts.filter(p=>p.isSlope).forEach(p=>slopes.push(p));
       tier.parts=parts;
-      tier.exitY=tier.y+rampDrop;
+      tier.startY=built.startY;
+      tier.exitY=built.exitY;
     }
 
     for(let i=0;i<tierCount-1;i++){
@@ -567,12 +606,13 @@
     }
     const tee=tiers[0],cupTier=tiers[tierCount-1];
     const startX=tee.dir===1?tee.x+67:tee.x+tee.w-67;
+    const startY=tee.startY??tee.y;
     const cupX=cupTier.dir===1?cupTier.x+cupTier.w*.79:cupTier.x+cupTier.w*.21;
     const par=(difficulty==='easy'?tierCount+2:tierCount+3)+(template.split>0?1:0);
     return {par,theme:themeKey,backdrop:randomBackdrop(themeKey),
       layout:goingUp?'uphill':'downhill',layoutKey:template.key,layoutName:template.name,
       ballType:randomBallKey(),firstDirection:tee.dir,tiers,transitions,slopes,
-      start:{x:startX,y:tee.y},cup:{x:cupX,y:cupTier.y},
+      start:{x:startX,y:startY},cup:{x:cupX,y:cupTier.y},
       mainPlatforms,platforms,greenWidth:greenMain.w};
   }
 
@@ -1622,7 +1662,7 @@
     startCard.style.display='none';ballCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
     overlay.classList.add('hidden');
     loadHole(0,true);
-    showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball · pads / movers / route splits`,2100);
+    showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball · curves / pads / routes`,2100);
   }
 
   function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
