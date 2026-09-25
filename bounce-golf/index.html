@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Bounce Golf · Physics Rebuild</title>
-<meta name="bounce-golf-version" content="2026-09-25-physics-rebuild-v1">
+<meta name="bounce-golf-version" content="2026-09-25-physics-rebuild-v2-quiet">
 <style>
   :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -44,7 +44,7 @@
   .ballBtn:active{transform:translateY(2px)}
   .ballDot{grid-row:1/3;width:34px;height:34px;border-radius:50%;border:2px solid rgba(0,0,0,.18);box-shadow:inset -5px -6px 0 rgba(0,0,0,.09)}
   .ballBtn strong{font-size:15px}.ballBtn small{font-size:11px;line-height:1.15;color:#5d7065;font-weight:750}
-  .ball-standard{background:#fff}.ball-heavy{background:#5f6670}.ball-bouncy{background:#ff8a2a}.ball-sticky{background:#62b84f}
+  .ball-standard{background:#fff;border-color:#111820}.ball-heavy{background:#5f6670}.ball-bouncy{background:#ff8a2a}.ball-sticky{background:#62b84f}
   #controls{display:grid;grid-template-columns:1fr 1.25fr;gap:7px;margin-top:8px}
   #aimControls{display:grid;grid-template-columns:1fr 1fr;gap:7px}
   button{border:0;border-radius:14px;min-height:58px;padding:10px 12px;font:900 16px system-ui;color:white;background:#2d6749;box-shadow:0 3px 0 #173b2a;touch-action:none}
@@ -132,7 +132,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
-        <div style="font-size:12px;font-weight:800;color:#437253;margin:-3px 0 10px">Flat Green · Physics Rebuild v1</div>
+        <div style="font-size:12px;font-weight:800;color:#437253;margin:-3px 0 10px">Flat Green · Physics Rebuild v2</div>
         <p>Nine varied landscapes every round: winding ridges, deep valleys, floating meadows, stepping stones and short rolling slopes. Each hole changes theme, and every shot gives you a different ball type.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
@@ -810,12 +810,21 @@
     if(preparedShotSerial===shotSerial||ball.sinking||ball.holed||!playing)return false;
     preparedShotSerial=shotSerial;
     ballTypeReadyForShot=false;
-    showMessage(message,850);
+    // No between-shot banner: the stationary ball and active controls are the cue.
     updateHud();
     return true;
   }
   const scoreText=n=>n===0?'E':n>0?'+'+n:String(n);
-  function showMessage(t,ms=1000){message.textContent=t;message.classList.add('show');clearTimeout(showMessage.t);showMessage.t=setTimeout(()=>message.classList.remove('show'),ms)}
+  function showMessage(t,ms=1000){
+    // Routine notices (next shot, ball type, bounce pad, green, reset) would
+    // cover the course between shots. Reserve this space for unexpected
+    // recovery messages only; hole results already have a dedicated overlay.
+    if(!/physics error|recovered/i.test(t))return;
+    message.textContent=t;
+    message.classList.add('show');
+    clearTimeout(showMessage.t);
+    showMessage.t=setTimeout(()=>message.classList.remove('show'),ms);
+  }
 
   function loadHole(idx,resetStrokes=true){
     holeIndex=idx; if(resetStrokes)strokes=0;
@@ -1219,7 +1228,7 @@
       ctx.strokeStyle='rgba(157,255,113,.84)';ctx.lineWidth=3;
       ctx.beginPath();ctx.arc(ball.x,drawY,r+4,0,Math.PI*2);ctx.stroke();
     }
-    ctx.fillStyle=bt.color;ctx.strokeStyle=bt.stroke;ctx.lineWidth=2;ctx.beginPath();ctx.arc(ball.x,drawY,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle=bt.color;ctx.strokeStyle=selectedBallType==='standard'?'#111820':bt.stroke;ctx.lineWidth=selectedBallType==='standard'?3.4:2;ctx.beginPath();ctx.arc(ball.x,drawY,r,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.fillStyle='rgba(0,0,0,.15)';for(const a of [0,.9,1.8,2.7,3.6,4.5,5.4]){ctx.beginPath();ctx.arc(ball.x+Math.cos(a)*r*.5,drawY+Math.sin(a)*r*.5,Math.max(.6,r*.13),0,Math.PI*2);ctx.fill()}
     ctx.restore();
   }
