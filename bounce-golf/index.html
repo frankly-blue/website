@@ -378,54 +378,40 @@
   }
 
   function buildCurvyTierParts(tier,isGreen){
-    const rockHeight=rand(34,46);
+    const rockHeight=rand(38,52);
     if(isGreen){
       return {parts:[{x:tier.x,y:tier.y,w:tier.w,h:rockHeight,isGreen:true,dir:tier.dir,flowers:false,ordinal:tier.ordinal}],
         startY:tier.y,exitY:tier.y};
     }
-    const shape=shuffle(['wave','ridge','terrace','swoop','basin'])[0];
+
+    // These profiles deliberately use large height changes so the terrain
+    // reads as rolling ground, rather than a row of almost-flat platforms.
+    const profiles=[
+      [{f:.14,d:0},{f:.22,d:34},{f:.18,d:0},{f:.23,d:-48},{f:.23,d:0}],   // dip then rise
+      [{f:.16,d:0},{f:.27,d:-42},{f:.18,d:0},{f:.22,d:36},{f:.17,d:0}],   // ridge
+      [{f:.12,d:0},{f:.20,d:46},{f:.16,d:0},{f:.28,d:-28},{f:.24,d:0}],   // long valley
+      [{f:.20,d:0},{f:.30,d:54},{f:.18,d:-18},{f:.18,d:-36},{f:.14,d:0}],// sweeping descent
+      [{f:.12,d:0},{f:.18,d:-28},{f:.18,d:36},{f:.22,d:30},{f:.30,d:-38}],// rolling S
+      [{f:.18,d:0},{f:.22,d:28},{f:.24,d:-52},{f:.20,d:34},{f:.16,d:0}]   // wave
+    ];
+    const profile=shuffle(profiles)[0];
     const parts=[];
-    let cursor=tier.x, currentY=tier.y;
-    const pushFlat=(w,y=currentY,extra={})=>{w=Math.max(44,w); parts.push({x:cursor,y,w,h:rockHeight,dir:tier.dir,flowers:false,ordinal:tier.ordinal,...extra}); cursor+=w; currentY=y;};
-    const pushSlope=(w,dy,extra={})=>{w=Math.max(38,w); parts.push({x:cursor,y:currentY,w,h:rockHeight,dy,isSlope:true,dir:tier.dir,flowers:false,ordinal:tier.ordinal,...extra}); cursor+=w; currentY+=dy;};
-    const w=tier.w;
-    const remain=()=>tier.x+tier.w-cursor;
-    if(shape==='wave'){
-      pushFlat(w*.18);
-      pushSlope(w*.18,rand(18,30));
-      pushFlat(w*.18,currentY);
-      pushSlope(w*.18,-rand(12,24));
-      pushFlat(remain());
-    }else if(shape==='ridge'){
-      pushFlat(w*.12);
-      pushSlope(w*.22,-rand(16,28));
-      pushFlat(w*.18,currentY);
-      pushSlope(w*.20,rand(16,28));
-      pushFlat(remain());
-    }else if(shape==='terrace'){
-      pushFlat(w*.22);
-      pushSlope(w*.11,rand(12,22));
-      pushFlat(w*.20,currentY);
-      pushSlope(w*.11,-rand(10,18));
-      pushFlat(remain());
-    }else if(shape==='swoop'){
-      pushFlat(w*.10);
-      pushSlope(w*.26,rand(22,34));
-      pushFlat(w*.10,currentY);
-      pushSlope(w*.21,-rand(10,22));
-      pushFlat(remain());
-    }else{ // basin
-      pushFlat(w*.16);
-      pushSlope(w*.15,rand(14,24));
-      pushFlat(w*.16,currentY);
-      pushSlope(w*.15,-rand(14,24));
-      pushFlat(remain());
+    let cursor=tier.x,currentY=tier.y;
+    for(let i=0;i<profile.length;i++){
+      const seg=profile[i];
+      let w=(i===profile.length-1)?tier.x+tier.w-cursor:tier.w*seg.f;
+      w=Math.max(48,w);
+      if(seg.d===0){
+        parts.push({x:cursor,y:currentY,w,h:rockHeight,dir:tier.dir,flowers:false,ordinal:tier.ordinal,terrainFlat:true});
+      }else{
+        const dy=seg.d*rand(.82,1.18);
+        parts.push({x:cursor,y:currentY,w,h:rockHeight,dy,isSlope:true,dir:tier.dir,flowers:false,ordinal:tier.ordinal,terrainCurve:true});
+        currentY+=dy;
+      }
+      cursor+=w;
     }
-    // Light cleanup and organic width variation
-    for(const part of parts){
-      if(part.w<40)part.w=40;
-    }
-    // Mirror profile when the playing direction moves right-to-left.
+
+    // Reverse the whole landform for right-to-left holes.
     if(tier.dir===-1){
       for(const part of parts){
         part.x=tier.x+tier.w-(part.x-tier.x)-part.w;
@@ -433,16 +419,15 @@
       }
       parts.sort((a,b)=>a.x-b.x);
     }
-    const startProbe=tier.dir===1?tier.x+Math.min(52,tier.w*.18):tier.x+tier.w-Math.min(52,tier.w*.18);
-    const exitProbe=tier.dir===1?tier.x+tier.w-4:tier.x+4;
-    let startY=tier.y,exitY=tier.y;
-    for(const part of parts){
-      if(startProbe>=part.x&&startProbe<=part.x+part.w)startY=partSurfaceY(part,startProbe);
-      if(exitProbe>=part.x&&exitProbe<=part.x+part.w)exitY=partSurfaceY(part,clamp(exitProbe,part.x,part.x+part.w));
-    }
-    return {parts,startY,exitY};
-  }
 
+    const surfaceAt=x=>{
+      const p=parts.find(q=>x>=q.x-1&&x<=q.x+q.w+1)||parts[0];
+      return p.isSlope ? p.y+p.dy*clamp((x-p.x)/p.w,0,1) : p.y;
+    };
+    const startProbe=tier.dir===1?tier.x+67:tier.x+tier.w-67;
+    const exitProbe=tier.dir===1?tier.x+tier.w-4:tier.x+4;
+    return {parts,startY:surfaceAt(startProbe),exitY:surfaceAt(exitProbe)};
+  }
 
   // Build a readable course from a distinct structural blueprint. Adjacent
   // terraces have aligned exit/entry ends, with real outboard stepping ledges.
@@ -568,9 +553,20 @@
     featurePlatforms.push(...altRoutes);
 
     // Bounce pads and moving platforms make individual holes feel distinct.
-    const bounceCandidates=shuffle(platforms.filter(p=>!p.isSlope&&!p.isGreen&&!p.isCrate&&!p.isApronSlope&&p.w>78&&p.h<=30));
-    for(const p of bounceCandidates.slice(0,randInt(1,2)))addBouncePad(p);
-    const movingCandidates=shuffle(platforms.filter(p=>(p.isConnector||p.isBonus||p.isAltRoute)&&!p.isGreen&&!p.isCrate&&!p.isSlope));
+    const bounceCandidates=shuffle(platforms.filter(p=>
+      p.terrainFlat&&!p.isGreen&&!p.isCrate&&!p.isConnector&&!p.isBonus&&!p.isAltRoute&&!p.motion&&p.w>=155));
+    if(bounceCandidates.length&&Math.random()<.72){
+      const p=bounceCandidates[0];
+      const padW=48;
+      // Put the pad toward the direction of travel, but leave a generous
+      // landing/run-up area on both sides so it never sits on an awkward lip.
+      const safe=70;
+      const desired=p.dir===1?p.x+p.w*.68:p.x+p.w*.32;
+      const cx=clamp(desired,p.x+safe,p.x+p.w-safe);
+      p.bouncePad={rel:(cx-p.x)/p.w,w:padW,power:rand(340,390),safePlacement:true};
+      p.bouncePad.x=cx;
+    }
+    const movingCandidates=shuffle(platforms.filter(p=>(p.isConnector||p.isBonus||p.isAltRoute)&&!p.isGreen&&!p.isCrate&&!p.isSlope&&!p.bouncePad));
     for(const p of movingCandidates.slice(0,Math.min(2,movingCandidates.length))){
       p.motion={axis:Math.random()<.65?'x':'y',amp:Math.random()<.65?rand(18,34):rand(14,22),speed:rand(.85,1.35)};
       p.baseX=p.x; p.baseY=p.y; p.prevX=p.x; p.prevY=p.y;
@@ -938,10 +934,18 @@
     }
     ctx.restore();
     ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
-    ctx.strokeStyle='#285f34';ctx.lineWidth=15;
+    ctx.strokeStyle='#285f34';ctx.lineWidth=18;
     ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y+dy);ctx.stroke();
-    ctx.strokeStyle=grass;ctx.lineWidth=9;
+    ctx.strokeStyle=grass;ctx.lineWidth=11;
     ctx.beginPath();ctx.moveTo(x,y-2);ctx.lineTo(x+w,y+dy-2);ctx.stroke();
+    // Small grass tufts reinforce that this is playable ground, not a ramp object.
+    ctx.strokeStyle='#2d7b35';ctx.lineWidth=2;
+    for(let t=.16;t<.9;t+=.22){
+      const gx=x+w*t,gy=y+dy*t-7;
+      ctx.beginPath();ctx.moveTo(gx-5,gy+5);ctx.lineTo(gx-1,gy-3);
+      ctx.moveTo(gx,gy+5);ctx.lineTo(gx+2,gy-5);
+      ctx.moveTo(gx+4,gy+5);ctx.lineTo(gx+9,gy-1);ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -953,10 +957,12 @@
     // Golden, hand-drawn stone islands with darker edges and individually
     // highlighted stones. All artwork uses the SAME collision rectangles.
     const snowy=th.label==='Snowy',volcanic=th.label==='Volcanic',desert=th.label==='Desert';
-    const rockBase=snowy?'#b5c7d0':volcanic?'#60575c':desert?'#c99653':'#b57d49';
-    const rockLight=snowy?'#f4faff':volcanic?'#9a8a86':desert?'#f7d596':'#ffdda0';
-    const rockMid=snowy?'#e3edf2':volcanic?'#7d7272':desert?'#e7bb75':'#f6c57e';
-    const rockDark=snowy?'#839fae':volcanic?'#3b353e':desert?'#98683e':'#916039';
+    // Unified grass-on-rock visual language; worlds vary mainly through sky,
+    // scenery and hazards so the course itself always reads clearly.
+    const rockBase='#a86f42';
+    const rockLight='#f7d69a';
+    const rockMid='#dca86b';
+    const rockDark='#795034';
     ctx.save();ctx.fillStyle=rockBase;inkStroke(rockDark,2.5);
     roundedRectPath(x,y,w,h,Math.min(8,h*.14));ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.rect(x+3,y+6,Math.max(0,w-6),Math.max(0,h-9));ctx.clip();
@@ -977,8 +983,8 @@
     }
     ctx.restore();
     // Saturated grass silhouette, scalloped underside and bright highlight.
-    const grassDark=isGreen?'#246c3b':isApron?'#328145':th.grass1;
-    const grassLight=isGreen?'#a5ed6c':isApron?'#7ed259':th.grass2;
+    const grassDark=isGreen?'#246c3b':isApron?'#328145':'#248c39';
+    const grassLight=isGreen?'#a5ed6c':isApron?'#7ed259':'#79dc43';
     ctx.save();inkStroke('#285c32',2.6);ctx.fillStyle=grassDark;
     ctx.beginPath();ctx.moveTo(x,y-7);ctx.lineTo(x+w,y-7);ctx.lineTo(x+w,y+10);
     for(let px=x+w;px>=x;px-=13){ctx.quadraticCurveTo(px-5,y+16,Math.max(x,px-13),y+9);}
