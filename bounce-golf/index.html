@@ -123,7 +123,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
-        <div style="font-size:12px;font-weight:800;color:#437253;margin:-3px 0 10px">Natural Roll v2</div>
+        <div style="font-size:12px;font-weight:800;color:#437253;margin:-3px 0 10px">Flat Green · Stable v4</div>
         <p>Nine varied landscapes every round: winding ridges, deep valleys, floating meadows, stepping stones and short rolling slopes. Each hole changes theme, and every shot gives you a different ball type.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
@@ -181,7 +181,7 @@
     </div>
     <div id="secondaryControls"><button id="resetBtn">Reset Ball</button><button id="pauseBtn">Pause</button></div>
   </div>
-  <div id="tip">Tap to aim, then hold HIT and release. Every shot uses a new random ball type and each world has its own ground physics. Sticky balls cling to solid platforms, side walls and the ceiling, but not to the green or the bottom hazard. The final island has a longer green and sometimes a connected approach. Your ball keeps its colour on the green and gives one little bounce on a proper landing before rolling normally. Every type rolls and putts with the same fair grass physics. Aim your putt towards the cup; most passes drop in, but very fast ones roll past. Each level starts at 45° towards the hole and power starts at zero. On the flat final green, putting power maps directly to distance: 50% rolls half the platform length, and 100% rolls one full platform length. Hold HIT to see an optional estimated stopping marker, then release. Underhit putts stop short; very hard putts roll past the cup and can fall off the edge. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
+  <div id="tip">Tap to aim, then hold HIT and release. Every shot uses a new random ball type and each world has its own ground physics. Sticky balls cling to solid platforms, side walls and the ceiling, but not to the green or the bottom hazard. The entire final island is a flat putting green, with no dips or slopes. Your ball keeps its colour on the green and gives one little bounce on a proper landing before rolling normally. Every type rolls and putts with the same fair grass physics. Aim your putt towards the cup; most passes drop in, but very fast ones roll past. Each level starts at 45° towards the hole and power starts at zero. On the flat final green, putting power maps directly to distance: 50% rolls half the platform length, and 100% rolls one full platform length. Hold HIT to see an optional estimated stopping marker, then release. Underhit putts stop short; very hard putts roll past the cup and can fall off the edge. If the ball falls into the themed hazard below the islands it is lost and that stroke still counts.</div>
 </div>
 <script>
 (()=>{
@@ -215,6 +215,7 @@
   let lastTime=performance.now(),restTimer=0,lastSafe={x:0,y:0,onGreen:false,attached:null};
   let selectedDifficulty='medium';
   let selectedBallType='standard',lastPlayedBallType=null,choosingBall=false,lossEffect=null,guideEnabled=true,wasPuttingMode=false;
+  let shotSerial=0,preparedShotSerial=0,roundSerial=0,respawnSerial=0,flightSeconds=0;
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const rand=(a,b)=>a+Math.random()*(b-a);
@@ -318,15 +319,39 @@
   const PUTT_CUP_RADIUS=9; // Smaller than the drawn cup; no magnetic suction.
   const greenSurface={surface:'Putting green',groundBounce:.14,landingGrip:1,rollDecay:.998,puttSpeed:1,wallBounce:1,cupCatch:1.25};
   function supportPlatform(x=ball.x,y=ball.y){
-    if(!holes.length)return null;
-    return currentHole().platforms.find(p=>{
+    if(!holes.length||!Number.isFinite(x)||!Number.isFinite(y))return null;
+    const h=currentHole();
+    // Resting balls follow the smooth interpolated terrain, NOT the small
+    // straight collision segments. Testing them against those segments made
+    // some settled balls falsely appear unsupported and endlessly restart.
+    if(ball.rollGroup!==null){
+      const group=h.terrainGroups?.find(g=>g.id===ball.rollGroup);
+      if(group&&x>=group.x+EDGE_INSET&&x<=group.x+group.w-EDGE_INSET){
+        const surface=smoothTerrain(group,x);
+        if(Math.abs(y-terrainCenterY(surface))<=7){
+          return group.pieces.find(p=>x>=p.x-.5&&x<=p.x+p.w+.5)||group.pieces[0]||null;
+        }
+      }
+    }
+    // When on the green, resolve its own single level collider first, even
+    // if a different island overlaps the same horizontal coordinates.
+    if(ball.onGreen){
+      const green=h.terrainGroups?.at(-1)?.greenPiece;
+      if(green&&x>=green.x+EDGE_INSET&&x<=green.x+green.w-EDGE_INSET&&
+         Math.abs(y-(green.y-BALL_R))<=8)return green;
+    }
+    return h.platforms.find(p=>{
       if(x<p.x+EDGE_INSET||x>p.x+p.w-EDGE_INSET)return false;
+      if(p.terrainSegment){
+        const group=h.terrainGroups?.find(g=>g.id===p.terrainGroup);
+        if(group&&Math.abs(y-terrainCenterY(smoothTerrain(group,x)))<=7)return true;
+      }
       if(p.isSlope){
         const s=p.dy/p.w,L=Math.hypot(1,s);
         const topY=p.y+s*(x-p.x);
         return Math.abs(y-(topY-BALL_R*L))<9;
       }
-      return Math.abs((y+BALL_R)-p.y)<12;
+      return Math.abs((y+BALL_R)-p.y)<10;
     })||null;
   }
   const onGreenPlatform=()=>ball.onGreen&&supportPlatform()===cupPlatform();
@@ -434,13 +459,28 @@
     const dir=reverse?-1:1;
     const green=ordinal===count-1;
     const depth=(H>720?(count>=4?69:76):(count>=4?41:62))+rand(-4,5);
-    // Flatten only the last section of the last island so putting is still fair.
-    // The approach, tee and rest of the terrain can be distinctly curved.
-    const knots=(landformShapes[spec.shape]||landformShapes.valley).map(q=>[q[0],q[1]*variation.curve]);
+    // The ENTIRE final island is a single horizontal putting green, including
+    // its entrance. Never apply the curving terrain profile or an apron dip to
+    // any section of this landmass. Its artwork and collision surface match.
     if(green){
-      knots.length=0;
-      knots.push([0,0],[.14,0],[.30,22*variation.curve],[.43,9*variation.curve],[.48,0],[1,0]);
+      const y=baseY;
+      const greenPiece={x,y,w,h:depth,dy:0,isSlope:false,
+        terrainSegment:true,terrainGroup:ordinal,isGreen:true,
+        dir,flowers:false,ordinal};
+      const startU=.105,endU=.94;
+      const startX=x+(dir===1?startU:1-startU)*w;
+      const exitX=x+(dir===1?endU:1-endU)*w;
+      return {
+        id:ordinal,x,y,w,dir,
+        points:[{x,y},{x:x+w,y}],
+        pieces:[greenPiece],greenPiece,depth,
+        startX,startY:y,exitX,exitY:y,
+        isGreen:true,skySeed:variation.seed
+      };
     }
+    // Earlier islands keep their individually generated hills, valleys and
+    // natural slopes. The final island has already returned as one flat green.
+    const knots=(landformShapes[spec.shape]||landformShapes.valley).map(q=>[q[0],q[1]*variation.curve]);
     if(!green&&ordinal>0&&ordinal<count-1){
       // Deliberately provide a broad, flat launch/landing terrace on some
       // middle islands so a springboard has usable space in front and behind.
@@ -454,13 +494,10 @@
     const locals=[];
     for(let i=0;i<=steps;i++){
       const u=i/steps;
-      if(green&&u>.48&&u<1)continue;
       locals.push([u,surface(u)]);
     }
-    if(green&&!locals.some(a=>Math.abs(a[0]-.48)<1e-4))locals.push([.48,surface(.48)]);
-    if(green)locals.push([1,surface(1)]);
     locals.sort((a,b)=>a[0]-b[0]);
-    // Explicit plateau points make collision sides on the green exactly flat.
+    // Collider points match the visible non-green terrain contour.
     const pts=locals.map(([u,y])=>({x:dir===1?x+u*w:x+(1-u)*w,y})).sort((a,b)=>a.x-b.x);
     const pieces=[];
     const add=(a,b,greenPiece=false)=>{
@@ -488,20 +525,11 @@
     const nonGreenSegments=[];
     for(let i=0;i<locals.length-1;i++){
       const a=locals[i],b=locals[i+1];
-      if(green&&a[0]>=.48-1e-5)continue;
-      nonGreenSegments.push([a[0]*w,Math.min(b[0],green?.48:1)*w]);
+      nonGreenSegments.push([a[0]*w,b[0]*w]);
     }
     if(dir===-1)nonGreenSegments.reverse();
     for(const [a,b] of nonGreenSegments){
       if(b-a>1)add(a,b);
-    }
-    if(green){
-      const a=.48*w,b=w;
-      add(a,b,true);
-      // Curved apron leads seamlessly onto the flat putting area.
-      const apron=pieces.filter(p=>!p.isGreen&&p.isSlope)
-        .sort((a,b)=>dir===1?b.x-a.x:a.x-b.x).slice(0,3);
-      for(const p of apron)p.isApronSlope=true;
     }
     pieces.sort((a,b)=>a.x-b.x);
     const startU=.105,endU=.94;
@@ -510,7 +538,6 @@
     const group={id:ordinal,x,y:baseY,w,dir,points:pts,pieces,depth,
       startX,startY:surface(startU),exitX,exitY:surface(endU),
       isGreen:green,skySeed:variation.seed};
-    if(green){group.greenPiece=pieces.find(p=>p.isGreen);}
     return group;
   }
 
@@ -554,13 +581,14 @@
     ctx.strokeStyle='#a5ee3a';ctx.lineWidth=4;ctx.stroke();
     ctx.restore();
     // A few distinctive plants, away from the tee and cup.
-    const count=g.w>490?3:2;
-    for(let j=0;j<count;j++){
-      const u=g.isGreen?(j===0?.21:.29):(.28+j*.27);
-      if(g.isGreen&&j>0)continue;
-      const x=g.x+u*g.w,y=terrainY(g,x);
-      if(g.id%3===1&&j===1)drawTree(x,y-9,g.w>500?.64:.46);
-      else drawBush(x,y-8,.34+(j%2)*.09);
+    if(!g.isGreen){
+      const count=g.w>490?3:2;
+      for(let j=0;j<count;j++){
+        const u=.28+j*.27;
+        const x=g.x+u*g.w,y=terrainY(g,x);
+        if(g.id%3===1&&j===1)drawTree(x,y-9,g.w>500?.64:.46);
+        else drawBush(x,y-8,.34+(j%2)*.09);
+      }
     }
   }
 
@@ -628,7 +656,7 @@
       const spec=template.forms[i];
       const next=template.forms[i+1],prev=template.forms[i-1];
       // Progress goes toward the next island. The final island enters from
-      // the previous island and ends with an integral flat putting green.
+      // the previous island and stays flat across its full playable width.
       const here=spec.x+spec.w*.5;
       const target=next?next.x+next.w*.5:prev?2*here-prev.x-prev.w*.5:here+.3;
       const dir=target>=here?1:-1;
@@ -766,11 +794,14 @@
   const movementBall=()=>ball.onGreen?ballTypes.standard:currentBall();
   const speed=()=>Math.hypot(ball.vx,ball.vy);
   function prepareNextShot(message='Ready for next shot'){
-    // Call only after a shot has finished: the ball remains visually the same
-    // during flight and roll, then changes to a different type for the next hit.
+    // Idempotent: even an unexpected repeated landing or respawn can only
+    // choose ONE new ball type per completed shot.
+    if(preparedShotSerial===shotSerial||ball.sinking||ball.holed||!playing)return false;
+    preparedShotSerial=shotSerial;
     selectedBallType=randomNextBallKey(lastPlayedBallType||selectedBallType);
     showMessage(`${currentBall().label} ball · ${message}`,950);
     updateHud();
+    return true;
   }
   const scoreText=n=>n===0?'E':n>0?'+'+n:String(n);
   function showMessage(t,ms=1000){message.textContent=t;message.classList.add('show');clearTimeout(showMessage.t);showMessage.t=setTimeout(()=>message.classList.remove('show'),ms)}
@@ -779,9 +810,13 @@
     holeIndex=idx; if(resetStrokes)strokes=0;
     const h=currentHole();
     selectedBallType=lastPlayedBallType?randomNextBallKey(lastPlayedBallType):(h.ballType||randomBallKey());
-    ball.x=h.start.x;ball.y=h.start.y-BALL_R-2;ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.rollGroup=0;ball.rollSpeed=0;ball.rollReversals=0;ball.lastRollDirection=0;
+    respawnSerial++;flightSeconds=0;preparedShotSerial=shotSerial;
+    const teeGroup=h.terrainGroups?.[0];
+    const teePoint=teeGroup?smoothTerrain(teeGroup,h.start.x):null;
+    ball.x=h.start.x;ball.y=teePoint?terrainCenterY(teePoint):h.start.y-BALL_R;
+    ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.rollGroup=teeGroup?.id??null;ball.rollSpeed=0;ball.rollReversals=0;ball.lastRollDirection=0;
     ball.ignoreTerrainGroup=null;ball.ignoreTerrainTime=0;ball.attached=null;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;ball.greenLandingBounceUsed=false;ball.puttingShot=false;ball.cupPassMissed=false;
-    lastSafe={x:ball.x,y:ball.y,onGreen:false,attached:null,rollGroup:0};restTimer=0;lossEffect=null;
+    lastSafe={x:ball.x,y:ball.y,onGreen:false,attached:null,rollGroup:ball.rollGroup};restTimer=0;lossEffect=null;
     // Every hole starts at a true 45-degree launch angle, towards the cup.
     const facingRight=(h.firstDirection||1)===1;
     angle=facingRight?-Math.PI/4:-3*Math.PI/4;
@@ -1220,7 +1255,9 @@
     drawBackground();
     const h=currentHole();
     drawWaterfall(h);
-    for(const g of h.terrainGroups)drawLandmass(g);
+    for(const g of h.terrainGroups)if(!g.isGreen)drawLandmass(g);
+    const flatGreen=h.terrainGroups.at(-1);
+    if(flatGreen?.isGreen)drawLandmass(flatGreen);
     for(const p of h.platforms){
       if(p.terrainSegment||p.isCrate)continue;
       if(p.isBridge)drawBridge(p);else drawPlatform(p);
@@ -1640,8 +1677,9 @@
     lossEffect={kind:th.hazardKind,x:clamp(ball.x,34,W-34),y:H-th.hazardDepth+8,start:performance.now(),color:th.effectColor};
     ball.lost=true;ball.moving=true;ball.rollGroup=null;ball.rollSpeed=null;ball.attached=null;ball.vx=ball.vy=0;
     showMessage(th.lossText,950);
+    const expectedRespawn=++respawnSerial,expectedHole=holeIndex,expectedRound=roundSerial;
     setTimeout(()=>{
-      if(!playing)return;
+      if(!playing||respawnSerial!==expectedRespawn||holeIndex!==expectedHole||roundSerial!==expectedRound)return;
       ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.moving=false;ball.rollGroup=lastSafe.rollGroup??null;ball.rollSpeed=0;ball.grounded=lastSafe.attached==='top'||!!lastSafe.onGreen||ball.rollGroup!==null;ball.attached=lastSafe.attached||null;ball.lost=false;ball.cupPassMissed=false;restTimer=0;
       ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;
       prepareNextShot('Play again from the last spot');
@@ -1735,12 +1773,12 @@
     if(!playing||paused||ball.sinking||ball.lost||ball.holed)return;
     if(ball.ignoreTerrainTime>0)ball.ignoreTerrainTime=Math.max(0,ball.ignoreTerrainTime-dt);
     if(!ball.moving){
-      // Recover from any unsupported resting position instead of freezing.
-      // An attached Sticky ball deliberately stays put on every solid face.
       if(ball.attached)return;
-      if(supportPlatform())return;
-      ball.moving=true;ball.grounded=false;ball.vy=Math.max(0,ball.vy);
-      restTimer=0;
+      if(supportPlatform()){ball.grounded=true;return;}
+      // If scenery changes or the ball is left at a genuine edge, release it
+      // into gravity without declaring a new completed shot.
+      ball.moving=true;ball.grounded=false;ball.rollGroup=null;
+      ball.vy=Math.max(0,ball.vy);restTimer=0;
     }
     if(ball.puttingShot){rollPutt(dt);return;}
     if(ball.rollGroup!==null){
@@ -1870,7 +1908,7 @@
     // Zero power means no shot. A very quick tap must not cost a stroke.
     if(power<2){power=0;updatePower();showMessage('Hold HIT to build power',650);return;}
     const putting=puttingMode();
-    strokes++;
+    strokes++;shotSerial++;flightSeconds=0;
     lastPlayedBallType=selectedBallType;
     ball.cupPassMissed=false;
     ball.rollGroup=null;ball.rollSpeed=null;ball.rollReversals=0;ball.lastRollDirection=0;
@@ -1917,8 +1955,9 @@
     // Keep the ball permanently hidden after it drops into the cup.
     ball.holed=true;ball.sinking=false;ball.moving=false;ball.vx=ball.vy=0;
     showHoleVictory(diff);
+    const finishedHole=holeIndex,finishedRound=roundSerial,completionToken=respawnSerial;
     setTimeout(()=>{
-      if(!playing)return;
+      if(!playing||holeIndex!==finishedHole||roundSerial!==finishedRound||respawnSerial!==completionToken)return;
       holeWinCard.style.display='none';
       if(holeIndex>=holes.length-1)finishRound();
       else{holeIndex++;loadHole(holeIndex,true);overlay.classList.add('hidden');showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball`,1800)}
@@ -1946,6 +1985,7 @@
   }
 
   function startGame(){
+    ++roundSerial;++respawnSerial;shotSerial=0;preparedShotSerial=0;flightSeconds=0;
     holes=generateCourse(selectedDifficulty);
     results=[];totalScore=0;holeIndex=0;playing=true;paused=false;lastPlayedBallType=null;selectedBallType='standard';
     startCard.style.display='none';ballCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
@@ -1956,7 +1996,22 @@
 
   function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
 
-  function resetBall(){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;ball.rollGroup=lastSafe.rollGroup??null;ball.rollSpeed=0;ball.attached=lastSafe.attached||null;ball.grounded=ball.attached==='top'||!!lastSafe.onGreen;ball.onGreen=!!lastSafe.onGreen;ball.puttingShot=false;ball.cupPassMissed=false;showMessage('Ball reset',600);updateHud()}
+  function resetBall(){
+    if(!playing||paused||choosingBall||ball.holed)return;
+    respawnSerial++;flightSeconds=0;
+    const h=currentHole(),fallback=h.terrainGroups?.[0];
+    const valid=Number.isFinite(lastSafe.x)&&Number.isFinite(lastSafe.y);
+    const x=valid?lastSafe.x:h.start.x;
+    const y=valid?lastSafe.y:terrainCenterY(smoothTerrain(fallback,h.start.x));
+    ball.x=x;ball.y=y;ball.vx=ball.vy=0;ball.moving=false;
+    ball.rollGroup=valid?(lastSafe.rollGroup??null):(fallback?.id??null);
+    ball.rollSpeed=0;ball.rollReversals=0;ball.attached=valid?(lastSafe.attached||null):null;
+    ball.grounded=true;ball.onGreen=valid?!!lastSafe.onGreen:false;
+    ball.sinking=false;ball.lost=false;ball.puttingShot=false;ball.cupPassMissed=false;
+    ball.ignoreTerrainGroup=null;ball.ignoreTerrainTime=0;restTimer=0;
+    // A reset isn't a new shot: never shuffle the ball type here.
+    showMessage('Ball reset — ready to play',800);updateHud();
+  }
   function adjustAngle(delta){
     if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
     if(puttingMode()){
@@ -2002,7 +2057,29 @@
     }
   });
 
-  function frame(t){const dt=Math.min(.025,(t-lastTime)/1000);lastTime=t;updateMovingPlatforms(dt);physics(dt);draw();requestAnimationFrame(frame)}
+  let consecutiveFrameErrors=0;
+  function frame(t){
+    const dt=Math.min(.025,Math.max(0,(t-lastTime)/1000));lastTime=t;
+    try{
+      if(playing&&!paused&&!ball.lost&&!ball.holed&&!ball.sinking&&ball.moving){
+        flightSeconds+=dt;
+        if(![ball.x,ball.y,ball.vx,ball.vy].every(Number.isFinite)||flightSeconds>25){
+          resetBall();showMessage('Ball recovered — take your next shot',1200);
+        }
+      }else flightSeconds=0;
+      updateMovingPlatforms(dt);physics(dt);draw();
+      consecutiveFrameErrors=0;
+    }catch(error){
+      console.error('Bounce Golf recovered from an unexpected error:',error);
+      consecutiveFrameErrors++;
+      if(consecutiveFrameErrors===1&&playing){
+        resetBall();showMessage('Ball reset after a physics error',1800);
+      }else if(consecutiveFrameErrors>=3){
+        playing=false;paused=true;pauseCard.style.display='block';overlay.classList.remove('hidden');
+        message.textContent='Please restart this hole';
+      }
+    }finally{requestAnimationFrame(frame)}
+  }
   holes=generateCourse(selectedDifficulty);setDifficulty(selectedDifficulty);loadHole(0,true);initDynamicPlatforms();draw();requestAnimationFrame(frame);
 })();
 </script>
