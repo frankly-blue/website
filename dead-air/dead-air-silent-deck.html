@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>DEAD AIR — The Silent Deck</title>
+<style>
+:root{color-scheme:dark;--bg:#07111f;--line:#31506b;--cyan:#6de4e8;--amber:#ffc36a;--red:#ff626e}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#050b14;color:#dcecf7;font-family:ui-monospace,Menlo,monospace}body{display:flex;justify-content:center;padding:12px}#gameShell{width:min(100%,1000px)}header{display:flex;justify-content:space-between;gap:12px;padding:8px 4px 12px}.logo{font-weight:900;letter-spacing:.16em;font-size:clamp(17px,3vw,25px)}.logo span{color:var(--red)}.chapter{font-size:11px;color:#89a7bf;text-align:right}#screen{position:relative;border:2px solid #42627a;background:#081422;overflow:hidden}canvas{display:block;width:100%;height:auto;image-rendering:pixelated;touch-action:none}#hud{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;padding:10px 2px;color:#a8c2d8;font-size:12px}.pill{border:1px solid #29465d;background:#0b1827;padding:7px 9px}.pill b{color:var(--cyan)}#message{min-height:45px;border:1px solid #29465d;background:#0b1725;padding:11px 13px;font-size:12px;line-height:1.55;color:#d2e4f1}#message strong{color:var(--amber)}#controls{display:flex;justify-content:space-between;gap:12px;padding-top:12px;touch-action:none}.group{display:flex;gap:8px}.ctrl{min-width:54px;min-height:48px;border:1px solid #42627a;background:#12243a;color:#effaff;font:700 16px ui-monospace,monospace;border-radius:5px;touch-action:none}.ctrl:active{background:#1e4960}.ctrl.action{font-size:11px;padding:0 12px;color:var(--amber)}#note{font-size:11px;color:#7693aa;line-height:1.5;margin:10px 2px}#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#06101be8;padding:20px;text-align:center}#overlay.hidden{display:none}.overlayCard{max-width:480px;border:1px solid #42627a;background:#0b1a2b;padding:clamp(18px,4vw,34px)}.kicker{color:var(--red);font-size:11px;letter-spacing:.2em}.overlayCard h1{font-size:clamp(25px,5vw,44px);line-height:1.05;margin:12px 0}.overlayCard p{font-size:12px;line-height:1.7;color:#a9c5d9}.primary{background:var(--amber);color:#1b1a18;border:0;padding:12px 18px;font:900 12px ui-monospace,monospace;cursor:pointer;margin-top:8px}@media(min-width:700px){#controls{display:none}}@media(max-width:480px){body{padding:7px}.ctrl{min-width:48px;min-height:46px}.chapter{font-size:9px}#hud{font-size:10px}}
+</style>
+</head>
+<body><main id="gameShell">
+<header><div class="logo">DEAD<span> AIR</span></div><div class="chapter">CHAPTER 01<br>THE SILENT DECK</div></header>
+<section id="screen"><canvas id="game" width="960" height="540" aria-label="Side-scrolling space station platform game"></canvas>
+<div id="overlay"><div class="overlayCard"><div class="kicker">ASTERION RESEARCH STATION // 2189</div><h1>THE SILENT<br>DECK</h1><p>Commander Rook is dead. The station is sealed. Someone has altered the security logs.</p><p><b>Explore the deck. Restore power. Find out what the cameras missed.</b></p><button class="primary" id="start">BEGIN INVESTIGATION</button></div></div></section>
+<div id="hud"><div class="pill">EVIDENCE <b id="evidenceCount">0 / 3</b></div><div class="pill">SYSTEM POWER <b id="powerState">OFFLINE</b></div><div class="pill">OBJECTIVE <b id="objective">Reach the lab</b></div></div>
+<div id="message" aria-live="polite"><strong>MISSION BRIEF:</strong> Move through the docking bay and investigate anything out of place.</div>
+<div id="controls"><div class="group"><button class="ctrl" data-hold="left">◀</button><button class="ctrl" data-hold="right">▶</button></div><div class="group"><button class="ctrl" data-press="jump">JUMP</button><button class="ctrl action" data-press="interact">INVESTIGATE</button></div></div>
+<div id="note">Find glowing objects and press INVESTIGATE when nearby. Desktop: A/D or arrow keys to move, Space to jump, E or Up to investigate.</div>
+</main>
+<script>
+(()=>{
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),W=960,H=540,worldW=2520;
+const $=id=>document.getElementById(id),ui={overlay:$('overlay'),start:$('start'),msg:$('message'),evidence:$('evidenceCount'),power:$('powerState'),objective:$('objective')};
+let started=false,won=false,powered=false,camera=0,frame=0,clues=new Set();const keys={left:false,right:false,jump:false,up:false};
+const p={x:70,y:398,w:24,h:36,vx:0,vy:0,onGround:false};
+const platforms=[
+{x:0,y:454,w:390,h:30},{x:430,y:454,w:180,h:30},{x:650,y:454,w:270,h:30},{x:960,y:454,w:260,h:30},{x:1260,y:454,w:310,h:30},{x:1600,y:454,w:230,h:30},{x:1860,y:454,w:660,h:30},
+{x:190,y:370,w:120,h:16},{x:505,y:350,w:115,h:16},{x:710,y:370,w:125,h:16},{x:1000,y:365,w:145,h:16},{x:1160,y:300,w:130,h:16},{x:1370,y:350,w:120,h:16},{x:1650,y:365,w:130,h:16},{x:1910,y:355,w:140,h:16},{x:2160,y:310,w:150,h:16}];
+const ladders=[{x:260,y:370,h:84},{x:555,y:350,h:104},{x:760,y:370,h:84},{x:1060,y:365,h:89},{x:1210,y:300,h:154},{x:1430,y:350,h:104},{x:1710,y:365,h:89},{x:1970,y:355,h:99},{x:2220,y:310,h:144}];
+const objs=[
+{id:'log',x:280,y:338,title:'DAMAGED ACCESS PANEL',text:'A fresh scrape cuts across the panel. The damage is recent. Someone opened this from the maintenance side.',kind:'clue'},
+{id:'power',x:800,y:336,title:'POWER ROUTER',text:'You reroute auxiliary power. Corridor lights return, and the security terminal comes online.',kind:'switch'},
+{id:'trace',x:1100,y:330,title:'INSULATION FIBRE',text:'A dark fibre is caught in the lab door track. It matches insulation used inside engineering service shafts.',kind:'clue'},
+{id:'doorlog',x:1450,y:320,title:'LABORATORY DOOR LOG',text:'No authorised entry is recorded after lockdown. A power interruption at 22:08 reset the local sensor for eleven seconds.',kind:'clue'},
+{id:'terminal',x:2220,y:270,title:'SECURITY TERMINAL',text:'RECOVERED FOOTAGE: at 22:09, a shadow moves across the laboratory ceiling. The official blueprint shows no passage there. Someone has hidden a route.',kind:'ending'}];
+const hazards=[{x:455,y:438,w:58,h:16},{x:1310,y:438,w:48,h:16},{x:1760,y:438,w:55,h:16}],stars=Array.from({length:100},(_,i)=>({x:i*173%worldW,y:25+i*71%300,s:i%4===0?2:1}));
+function say(a,b){ui.msg.innerHTML='<strong>'+a+':</strong> '+b}
+function updateUI(){ui.evidence.textContent=clues.size+' / 3';ui.power.textContent=powered?'ONLINE':'OFFLINE';ui.objective.textContent=won?'Chapter complete':!clues.has('log')?'Search the docking bay':!powered?'Restore power':!clues.has('trace')?'Investigate the lab route':!clues.has('doorlog')?'Check the door log':'Reach security terminal'}
+function reset(){p.x=70;p.y=398;p.vx=p.vy=0;camera=0;frame=0;started=false;won=false;powered=false;clues=new Set();keys.left=keys.right=keys.jump=keys.up=false;ui.overlay.classList.remove('hidden');ui.overlay.querySelector('.kicker').textContent='ASTERION RESEARCH STATION // 2189';ui.overlay.querySelector('h1').innerHTML='THE SILENT<br>DECK';ui.overlay.querySelectorAll('p')[0].textContent='Commander Rook is dead. The station is sealed. Someone has altered the security logs.';ui.overlay.querySelectorAll('p')[1].innerHTML='<b>Explore the deck. Restore power. Find out what the cameras missed.</b>';ui.start.textContent='BEGIN INVESTIGATION';updateUI();say('MISSION BRIEF','Move through the docking bay and investigate anything out of place.')}
+function start(){started=true;ui.overlay.classList.add('hidden')}
+ui.start.onclick=()=>{if(won)reset();start()};
+function interact(){if(!started||won)return;const o=objs.find(o=>Math.abs(o.x+8-(p.x+p.w/2))<64&&Math.abs(o.y-(p.y+p.h/2))<86);if(!o){say('NO INTERACTION','Move closer to a glowing object or terminal.');return}
+if(o.kind==='switch'){powered=true;say(o.title,o.text)}
+else if(o.kind==='clue'){if(!clues.has(o.id)){clues.add(o.id);say('EVIDENCE ADDED',o.text)}else say(o.title,o.text)}
+else{if(!powered){say('TERMINAL OFFLINE','Restore power in the power corridor first.');return}if(!clues.has('trace')||!clues.has('doorlog')){say('INCOMPLETE RECORD','Investigate the lab route and door log first.');return}won=true;say('CHAPTER COMPLETE',o.text);ui.overlay.classList.remove('hidden');ui.overlay.querySelector('.kicker').textContent='CASE FILE // PARTIAL RECOVERY';ui.overlay.querySelector('h1').innerHTML='THE ROUTE<br>THAT WASN’T';ui.overlay.querySelectorAll('p')[0].textContent='You proved the station blueprint is incomplete. The killer used a concealed passage—but who, and why?';ui.overlay.querySelectorAll('p')[1].innerHTML='<b>Chapter One complete. The investigation continues.</b>';ui.start.textContent='PLAY AGAIN'}updateUI()}
+function move(){if(!started||won)return;frame++;if(keys.left)p.vx=Math.max(-3.7,p.vx-.62);if(keys.right)p.vx=Math.min(3.7,p.vx+.62);if(!keys.left&&!keys.right)p.vx*=.78;p.x=Math.max(0,Math.min(worldW-p.w,p.x+p.vx));const old=p.y;p.vy=Math.min(10,p.vy+.48);p.y+=p.vy;p.onGround=false;
+for(const a of platforms)if(p.x+p.w>a.x&&p.x<a.x+a.w&&old+p.h<=a.y+2&&p.y+p.h>=a.y&&p.vy>=0){p.y=a.y-p.h;p.vy=0;p.onGround=true}
+if(keys.jump&&p.onGround){p.vy=-9.5;p.onGround=false;keys.jump=false}
+if(keys.up){const l=ladders.find(l=>Math.abs(p.x+p.w/2-l.x)<18&&p.y+p.h>l.y&&p.y<l.y+l.h);if(l){p.vy=0;p.y=Math.max(l.y-p.h,p.y-2.4)}}
+if(p.y>H+80){p.x=Math.max(30,p.x-90);p.y=400;p.vy=0;say('SAFETY RESET','You slipped from the walkway. Magnetic boots pull you back to the deck.')}
+for(const h of hazards)if(p.x+p.w>h.x&&p.x<h.x+h.w&&p.y+p.h>h.y){p.x=Math.max(20,p.x-110);p.y=418;p.vy=0;say('ELECTRICAL ARC','You were knocked back by a live cable. Find a safe route.')}
+camera=Math.max(0,Math.min(worldW-W,p.x-W*.34))}
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))}
+function label(t,x,y,size=12,c='#dcecf7'){ctx.fillStyle=c;ctx.font='bold '+size+'px monospace';ctx.fillText(t,x,y)}
+function draw(){ctx.clearRect(0,0,W,H);rect(0,0,W,H,'#071321');for(const s of stars){let x=(s.x-camera*.18+worldW)%worldW;if(x<W)rect(x,s.y,s.s,s.s===2?'#8cb5cf':'#35526c')}
+rect(740-camera*.04,55,130,130,'#173b59');rect(755-camera*.04,64,112,105,'#245c7b');rect(775-camera*.04,86,76,14,'#2f7290');rect(752-camera*.04,125,94,10,'#1b4a6a');
+for(let x=Math.floor(camera/160)*160;x<camera+W+160;x+=160){let sx=x-camera;rect(sx,0,2,454,'#172d40');rect(sx+8,20,112,3,'#1a3449');rect(sx+8,30,3,35,'#1a3449');rect(sx+15,420,100,4,'#203e53')}
+rect(0,0,W,16,'#14283a');rect(0,16,W,5,'#36526a');for(let x=0;x<W;x+=80){rect(x,16,4,20,'#2b455b');rect(x+14,26,50,3,'#1a3449')}
+for(const a of platforms){let x=a.x-camera;if(x+a.w<0||x>W)continue;rect(x,a.y,a.w,a.h,'#263d50');rect(x,a.y,a.w,5,'#6c8799');rect(x,a.y+6,a.w,3,'#172a3a');for(let bx=x+12;bx<x+a.w;bx+=42)rect(bx,a.y+14,12,3,'#3b5669')}
+for(const l of ladders){let x=l.x-camera;if(x<-30||x>W+30)continue;rect(x-8,l.y,4,l.h,'#8b9fac');rect(x+8,l.y,4,l.h,'#8b9fac');for(let y=l.y+7;y<l.y+l.h;y+=12)rect(x-8,y,20,3,'#617c8e')}
+for(const h of hazards){let x=h.x-camera;if(x<-80||x>W+80)continue;rect(x,h.y,h.w,h.h,'#442b3b');for(let i=0;i<4;i++){rect(x+5+i*14,h.y+2,4,3,'#ff626e');if(frame%36<18)rect(x+8+i*14,h.y-5,3,7,'#ffc36a')}}
+for(const d of [{x:350,y:354,w:45,h:100},{x:900,y:350,w:35,h:104},{x:1540,y:345,w:44,h:109},{x:1815,y:345,w:34,h:109}]){let x=d.x-camera;if(x<-60||x>W+60)continue;rect(x,d.y,d.w,d.h,'#142a3e');rect(x+5,d.y+5,d.w-10,d.h-10,'#203e54');rect(x+8,d.y+10,5,8,powered?'#65e0b1':'#ff626e')}
+for(const o of objs){let x=o.x-camera;if(x<-50||x>W+50)continue;let c=o.kind==='switch'?(powered?'#65e0b1':'#ffc36a'):o.kind==='ending'?'#6de4e8':clues.has(o.id)?'#65e0b1':'#ffc36a';rect(x,o.y,22,20,'#101e2d');rect(x+3,o.y+3,16,14,c);rect(x+6,o.y+6,10,2,'#efffff');if(Math.abs(o.x+8-(p.x+p.w/2))<64&&Math.abs(o.y-(p.y+p.h/2))<86){rect(x-23,o.y-22,68,14,'#07101d');label('E SCAN',x-19,o.y-12,8,'#fff0bd')}}
+for(const s of [{x:65,t:'DOCK 03'},{x:650,t:'POWER'},{x:990,t:'LAB SECTOR'},{x:1890,t:'SECURITY'}]){let x=s.x-camera;if(x>0&&x<W-60){rect(x,62,88,22,'#0d2032');rect(x,62,3,22,'#ffc36a');label(s.t,x+9,77,10,'#9bb9cf')}}
+let x=p.x-camera,y=p.y;rect(x+2,y+p.h-2,p.w-4,4,'#03080e');rect(x+5,y+8,15,20,'#c46d45');rect(x+5,y+8,15,5,'#e9a36b');rect(x+3,y+13,4,12,'#e9a36b');rect(x+18,y+13,4,12,'#e9a36b');rect(x+4,y,17,13,'#d8e8ed');rect(x+7,y+3,12,7,'#24516a');rect(x+8,y+4,8,3,'#75dce1');rect(x+5,y+27,6,8,'#73899a');rect(x+15,y+27,6,8,'#73899a');rect(x+1,y+12,4,10,'#ffc36a');
+rect(0,0,W,2,'#4c7188');rect(0,H-3,W,3,'#12273a');if(!started){rect(18,H-36,250,20,'#0b1b2a');label('AWAITING ENGINEER INPUT',28,H-22,10,'#6e94ad')}requestAnimationFrame(draw)}
+function keydown(e){let k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup',' '].includes(k))e.preventDefault();if(k==='a'||k==='arrowleft')keys.left=true;if(k==='d'||k==='arrowright')keys.right=true;if(k==='w'||k==='arrowup')keys.up=true;if(k===' '||k==='w')keys.jump=true;if((k==='e'||k==='arrowup')&&!e.repeat)interact();if(k==='escape'&&started){started=false;ui.overlay.classList.remove('hidden');ui.overlay.querySelector('.kicker').textContent='SYSTEM PAUSED';ui.overlay.querySelector('h1').textContent='PAUSED';ui.overlay.querySelectorAll('p')[0].textContent='The station clock keeps ticking.';ui.overlay.querySelectorAll('p')[1].innerHTML='<b>Press resume to continue.</b>';ui.start.textContent='RESUME';ui.start.onclick=()=>{ui.start.onclick=null;start();ui.start.onclick=()=>{if(won)reset();start()}}}}
+function keyup(e){let k=e.key.toLowerCase();if(k==='a'||k==='arrowleft')keys.left=false;if(k==='d'||k==='arrowright')keys.right=false;if(k==='w'||k==='arrowup')keys.up=false}
+window.addEventListener('keydown',keydown);window.addEventListener('keyup',keyup);
+document.querySelectorAll('[data-hold]').forEach(b=>{let k=b.dataset.hold;const off=()=>keys[k]=false;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId)});b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off)});
+document.querySelectorAll('[data-press]').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();if(b.dataset.press==='jump')keys.jump=true;else interact()}));
+canvas.addEventListener('pointerdown',()=>{if(!started)start()});reset();requestAnimationFrame(draw);(function loop(){move();requestAnimationFrame(loop)})();
+})();
+</script></body></html>
