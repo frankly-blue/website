@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Bounce Golf · Physics Rebuild</title>
-<meta name="bounce-golf-version" content="2026-09-25-physics-rebuild-v2-quiet">
+<title>Bounce Golf · Reliable Play v2</title>
+<meta name="bounce-golf-version" content="2026-10-23-reliable-play-v2">
 <style>
   :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -16,7 +16,7 @@
   #stage{position:relative;background:#9fd6f6;border:4px solid #f6e8bd;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
   canvas{display:block;width:100%;height:auto;background:#a8dcff}
   #message{position:absolute;left:50%;top:12%;transform:translateX(-50%);background:rgba(255,248,230,.95);padding:8px 14px;border-radius:999px;font-weight:900;opacity:0;transition:.18s;pointer-events:none;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis}
-  #message.show{opacity:1}
+  #message,#message.show{display:none!important}
   #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(16,42,31,.78);z-index:10}
   #overlay.hidden{display:none}
   .card{width:min(92%,460px);background:#fff9e8;border-radius:22px;padding:22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
@@ -44,7 +44,7 @@
   .ballBtn:active{transform:translateY(2px)}
   .ballDot{grid-row:1/3;width:34px;height:34px;border-radius:50%;border:2px solid rgba(0,0,0,.18);box-shadow:inset -5px -6px 0 rgba(0,0,0,.09)}
   .ballBtn strong{font-size:15px}.ballBtn small{font-size:11px;line-height:1.15;color:#5d7065;font-weight:750}
-  .ball-standard{background:#fff;border-color:#111820}.ball-heavy{background:#5f6670}.ball-bouncy{background:#ff8a2a}.ball-sticky{background:#62b84f}
+  .ball-standard{background:#fff}.ball-heavy{background:#5f6670}.ball-bouncy{background:#ff8a2a}.ball-sticky{background:#62b84f}
   #controls{display:grid;grid-template-columns:1fr 1.25fr;gap:7px;margin-top:8px}
   #aimControls{display:grid;grid-template-columns:1fr 1fr;gap:7px}
   button{border:0;border-radius:14px;min-height:58px;padding:10px 12px;font:900 16px system-ui;color:white;background:#2d6749;box-shadow:0 3px 0 #173b2a;touch-action:none}
@@ -132,7 +132,7 @@
       <div class="card" id="startCard">
         <div style="font-size:50px">⛳</div>
         <h1>Bounce Golf</h1>
-        <div style="font-size:12px;font-weight:800;color:#437253;margin:-3px 0 10px">Flat Green · Physics Rebuild v2</div>
+        <div style="font-size:12px;font-weight:800;color:#437253;margin:-3px 0 10px">Flat Green · Physics Rebuild v1</div>
         <p>Nine varied landscapes every round: winding ridges, deep valleys, floating meadows, stepping stones and short rolling slopes. Each hole changes theme, and every shot gives you a different ball type.</p>
         <div class="difficultyLabel">Choose difficulty</div>
         <div class="difficultyGrid" id="difficultyGrid">
@@ -324,8 +324,8 @@
   const GREEN_ROLL_DECAY=.982; // Shorter natural green landing roll; deliberate putts use their separate calibrated model.
   const GREEN_REST_SPEED=11;
   const PUTT_DECELERATION=360; // Pixels per second squared.
-  const PUTT_CUP_MAX_SPEED=235; // Ordinary rolls drop; only very fast passes skip the cup.
-  const PUTT_CUP_RADIUS=9; // Smaller than the drawn cup; no magnetic suction.
+  const PUTT_CUP_MAX_SPEED=255; // Ordinary rolls drop; only very fast passes skip the cup.
+  const PUTT_CUP_RADIUS=10; // Smaller than the drawn cup; no magnetic suction.
   const greenSurface={surface:'Putting green',groundBounce:.14,landingGrip:1,rollDecay:.998,puttSpeed:1,wallBounce:1,cupCatch:1.25};
   function supportPlatform(x=ball.x,y=ball.y){
     if(!holes.length||!Number.isFinite(x)||!Number.isFinite(y))return null;
@@ -373,7 +373,7 @@
     ball.attached=null;
     // Keep the shot's ball colour and type. Only its movement switches to
     // consistent, ordinary grass physics; do not make it white or stop it.
-    showMessage('On the green — let it roll, then putt!',1100);
+    // Keep the playfield quiet: no inter-shot message overlays.
     updateHud();
   }
 
@@ -489,7 +489,9 @@
     }
     // Earlier islands keep their individually generated hills, valleys and
     // natural slopes. The final island has already returned as one flat green.
-    const knots=(landformShapes[spec.shape]||landformShapes.valley).map(q=>[q[0],q[1]*variation.curve]);
+    const knots=(spec.horizontalLevel
+      ? [[0,0],[1,0]]
+      : (landformShapes[spec.shape]||landformShapes.valley).map(q=>[q[0],q[1]*variation.curve]));
     if(!green&&ordinal>0&&ordinal<count-1){
       // Deliberately provide a broad, flat launch/landing terrace on some
       // middle islands so a springboard has usable space in front and behind.
@@ -660,54 +662,60 @@
       return top+z*(bottom-top);
     });
     const groups=[],platforms=[],transitions=[],slopes=[],mainPlatforms=[];
-    const variance=rand(.89,1.12);
-    for(let i=0;i<template.forms.length;i++){
-      const spec=template.forms[i];
-      const next=template.forms[i+1],prev=template.forms[i-1];
-      // Progress goes toward the next island. The final island enters from
-      // the previous island and stays flat across its full playable width.
-      const here=spec.x+spec.w*.5;
-      const target=next?next.x+next.w*.5:prev?2*here-prev.x-prev.w*.5:here+.3;
-      const dir=target>=here?1:-1;
-      // Four islands must fit into a landscape-height phone/desktop canvas;
-      // profiles remain genuinely curved but shallower than portrait ones.
-      const relief=template.forms.length>=4?(H>720?.83:.52):(H>720?1:.74);
-      const local={x:rand(-8,8),w:rand(-7,7),curve:relief*variance*rand(.90,1.11),seed:idx*19+i*73+11};
-      const group=createLandmass(spec,i,template.forms.length,dir<0,difficulty,levels[i],local);
+    const variance=rand(.96,1.04);
+    const levelCount=template.forms.length;
+    const levelLeft=32, levelWidth=W-64;
+    // The course is now a stack of broad, side-to-side levels. Each level
+    // reaches almost the full screen width; the route alternates left/right
+    // so a visible ramp always provides a way up to the next tier.
+    const levelOrder=template.forms.map((f,i)=>i).sort((a,b)=>template.forms[a].z-template.forms[b].z);
+    const physicalLevelY=template.forms.map((_,i)=>{
+      const rank=levelOrder.indexOf(i);
+      return bottom-(rank/(levelCount-1))*(bottom-top);
+    });
+    const rampEnds=[];
+    for(let i=0;i<levelCount;i++){
+      const spec={...template.forms[i],x:levelLeft/W,w:levelWidth/W,horizontalLevel:true,shape:'soft'};
+      const next=template.forms[i+1];
+      // Alternate the ramp side so players traverse across one level, climb,
+      // then travel back across the next one.
+      const dir=(i%2===0)?1:-1;
+      const local={x:0,w:0,curve:0,seed:idx*19+i*73+11};
+      const group=createLandmass(spec,i,levelCount,dir<0,difficulty,physicalLevelY[i],local);
+      group.horizontalLevel=true;
+      group.dir=dir;
+      // Set exact flat top surface and matching collider for every non-green tier.
+      if(!group.isGreen){
+        group.points=[{x:group.x,y:physicalLevelY[i]},{x:group.x+group.w,y:physicalLevelY[i]}];
+        group.pieces=[{x:group.x,y:physicalLevelY[i],w:group.w,h:group.depth,dy:0,isSlope:false,
+          terrainSegment:true,terrainGroup:i,isGreen:false,dir,flowers:false,ordinal:i}];
+        group.startY=group.exitY=physicalLevelY[i];
+        group.startX=dir===1?group.x+42:group.x+group.w-42;
+        group.exitX=dir===1?group.x+group.w-42:group.x+42;
+      }
       groups.push(group);platforms.push(...group.pieces);mainPlatforms.push(...group.pieces);
       slopes.push(...group.pieces.filter(p=>p.isSlope));
     }
-    // A visibly different connector structure on each route: optional
-    // stepping stones and the occasional safe wooden bridge.
+    // Add a solid, traversable ramp at alternating ends between every pair
+    // of levels. It touches both level edges and is not a floating island.
     for(let i=0;i<groups.length-1;i++){
       const from=groups[i],to=groups[i+1];
-      const left=Math.max(from.x,to.x),right=Math.min(from.x+from.w,to.x+to.w);
-      const aligned=right-left;
-      const middleY=(from.exitY+to.startY)/2;
-      const xGuess=aligned>110?lerp(left,right,.5):lerp(from.exitX,to.startX,.52);
-      const width=rand(79,109),stepX=clamp(xGuess-width/2,33,W-width-33);
-      const aboveAt=groups.filter(g=>stepX+width>g.x+12&&stepX<g.x+g.w-12)
-        .some(g=>Math.abs(terrainY(g,clamp(stepX+width/2,g.x,g.x+g.w))-middleY)<g.depth+17);
-      if(!aboveAt&&(template.shortcuts.some(a=>a[0]===i)||Math.random()<.45)){
-        const p={x:stepX,y:middleY,w:width,h:22,flowers:false,isAltRoute:true,dir:to.dir};
-        platforms.push(p);transitions.push(p);
-        if(i%2===0&&Math.random()<.62){
-          p.motion={axis:Math.random()<.57?'x':'y',amp:rand(11,22),speed:rand(.68,.98),phase:rand(0,6.2)};
-          p.baseX=p.x;p.baseY=p.y;p.prevX=p.x;p.prevY=p.y;
-        }
-      }
-      const nextGap=to.x-(from.x+from.w);
-      const reverseGap=from.x-(to.x+to.w);
-      const horizontalGap=Math.max(nextGap,reverseGap,0);
-      if(template.bridge?.some(a=>a[0]===i)&&horizontalGap>22&&horizontalGap<108&&Math.abs(from.exitY-to.startY)<40){
-        const bridgeX=nextGap>0?from.x+from.w:to.x+to.w;
-        const bridge={x:bridgeX,y:(from.exitY+to.startY)/2,w:horizontalGap,h:10,isBridge:true,flowers:false};
-        platforms.push(bridge);transitions.push(bridge);
-      }
+      const rampX=(i%2===0)?W-100:32;
+      const rampW=68;
+      const upperY=Math.min(from.startY,to.startY), lowerY=Math.max(from.startY,to.startY);
+      const ramp={x:rampX,y:upperY,w:rampW,h:22,dy:lowerY-upperY,isSlope:true,
+        terrainSegment:true,isConnector:true,dir:i%2===0?1:-1,flowers:false,ordinal:i};
+      platforms.push(ramp);transitions.push(ramp);slopes.push(ramp);
+      from.exitX=i%2===0?W-42:42;
+      from.exitY=from.startY;
+      to.startX=i%2===0?W-42:42;
+      to.startY=to.startY;
     }
+    // The only transitions are the deliberate ramps joining adjacent
+    // side-to-side levels; don't add floating shortcut islands or bridges.
     // A spring is deliberately placed only on a long, stationary, level
     // middle-island terrace, with >=40px clear grass on either side.
-    const padCandidates=shuffle(platforms.filter(p=>p.padCandidate&&p.w>=126&&
+    const padCandidates=shuffle(platforms.filter(p=>p.terrainSegment&&!p.isConnector&&p.w>=180&&
       p.ordinal>0&&p.ordinal<groups.length-1&&!p.motion&&!p.isSlope&&!p.isGreen));
     if(padCandidates.length&&Math.random()<.65){
       const p=padCandidates[0];
@@ -810,21 +818,12 @@
     if(preparedShotSerial===shotSerial||ball.sinking||ball.holed||!playing)return false;
     preparedShotSerial=shotSerial;
     ballTypeReadyForShot=false;
-    // No between-shot banner: the stationary ball and active controls are the cue.
+    showMessage(message,850);
     updateHud();
     return true;
   }
   const scoreText=n=>n===0?'E':n>0?'+'+n:String(n);
-  function showMessage(t,ms=1000){
-    // Routine notices (next shot, ball type, bounce pad, green, reset) would
-    // cover the course between shots. Reserve this space for unexpected
-    // recovery messages only; hole results already have a dedicated overlay.
-    if(!/physics error|recovered/i.test(t))return;
-    message.textContent=t;
-    message.classList.add('show');
-    clearTimeout(showMessage.t);
-    showMessage.t=setTimeout(()=>message.classList.remove('show'),ms);
-  }
+  function showMessage(t,ms=1000){message.textContent='';message.classList.remove('show');clearTimeout(showMessage.t)}
 
   function loadHole(idx,resetStrokes=true){
     holeIndex=idx; if(resetStrokes)strokes=0;
@@ -1228,7 +1227,7 @@
       ctx.strokeStyle='rgba(157,255,113,.84)';ctx.lineWidth=3;
       ctx.beginPath();ctx.arc(ball.x,drawY,r+4,0,Math.PI*2);ctx.stroke();
     }
-    ctx.fillStyle=bt.color;ctx.strokeStyle=selectedBallType==='standard'?'#111820':bt.stroke;ctx.lineWidth=selectedBallType==='standard'?3.4:2;ctx.beginPath();ctx.arc(ball.x,drawY,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle=bt.color;ctx.strokeStyle=(selectedBallType==='standard'?'#111820':bt.stroke);ctx.lineWidth=(selectedBallType==='standard'?3.2:2.4);ctx.beginPath();ctx.arc(ball.x,drawY,r,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.fillStyle='rgba(0,0,0,.15)';for(const a of [0,.9,1.8,2.7,3.6,4.5,5.4]){ctx.beginPath();ctx.arc(ball.x+Math.cos(a)*r*.5,drawY+Math.sin(a)*r*.5,Math.max(.6,r*.13),0,Math.PI*2);ctx.fill()}
     ctx.restore();
   }
@@ -1252,6 +1251,34 @@
     ctx.fillStyle='rgba(24,53,44,.9)';ctx.beginPath();ctx.roundRect(tx-tw/2,ty-16,tw,23,7);ctx.fill();
     ctx.fillStyle='#ffffff';ctx.fillText(label,tx,ty);
     ctx.restore();
+  }
+
+
+  function drawFlightPreview(){
+    if(!playing||paused||!guideEnabled||ball.moving||ball.sinking||ball.lost||ball.holed||puttingMode()||power<4)return;
+    const bt=currentBall();
+    const launchSpeed=(160+power*7)*bt.launch;
+    let x=ball.x+Math.cos(angle)*(BALL_R+4), y=ball.y+Math.sin(angle)*(BALL_R+4);
+    let vx=Math.cos(angle)*launchSpeed, vy=Math.sin(angle)*launchSpeed;
+    const grav=GRAVITY*bt.gravity;
+    ctx.save();ctx.lineCap='round';ctx.setLineDash([4,7]);ctx.lineWidth=3;
+    ctx.strokeStyle='rgba(20,43,51,.85)';ctx.beginPath();ctx.moveTo(x,y);
+    let lastX=x,lastY=y;
+    for(let i=1;i<=22;i++){
+      const dt=.075; x+=vx*dt; y+=vy*dt; vy+=grav*dt; vx*=1-.045*dt;
+      if(i%2===0)ctx.lineTo(x,y);
+      if(x<10||x>W-10||y<8||y>H-20)break;
+      // Stop the preview at the first likely terrain top crossing.
+      let hit=false;
+      for(const g of currentHole().terrainGroups||[]){
+        if(x>=g.x&&x<=g.x+g.w){const top=terrainCenterY(smoothTerrain(g,x));if(lastY<=top&&y>=top){hit=true;break;}}
+      }
+      if(hit)break;
+      lastX=x;lastY=y;
+    }
+    ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#ffdf43';ctx.strokeStyle='#1c343a';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(lastX,lastY,4,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
   }
 
   function drawAim(){
@@ -1294,7 +1321,7 @@
     const sx=h.start.x+h.firstDirection*62;
     const first=h.tiers[0];
     if(sx>first.x+29&&sx<first.x+first.w-29)drawDirectionSign(sx,h.start.y-8,h.firstDirection);
-    drawCup();drawPuttGuide();drawAim();drawBall();drawLossEffect();
+    drawCup();drawFlightPreview();drawPuttGuide();drawAim();drawBall();drawLossEffect();
   }
 
   function circleRectCollision(p){
@@ -1450,7 +1477,7 @@
     ball.sinking=true;ball.moving=false;ball.puttingShot=false;
     ball.rollGroup=null;ball.vx=ball.vy=0;
     ball.x=currentHole().cup.x;ball.y=cupSurfaceY()-BALL_R;
-    ball.sinkStart=performance.now();showMessage('In the hole!',600);
+    ball.sinkStart=performance.now();
     const currentRound=roundSerial,currentHoleIndex=holeIndex,token=respawnSerial;
     setTimeout(()=>{
       if(!playing||roundSerial!==currentRound||holeIndex!==currentHoleIndex||respawnSerial!==token||!ball.sinking)return;
@@ -1628,7 +1655,7 @@
       else break;
       if(!ball.moving||ball.sinking||ball.lost||ball.holed)break;
       if(![ball.x,ball.y,ball.vx,ball.vy].every(Number.isFinite)){
-        resetBall();showMessage('Ball recovered — ready to shoot',1000);break;
+        resetBall();break;
       }
     }
   }
@@ -1636,7 +1663,7 @@
   function hitBall(){
     if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
     // Zero power means no shot. A very quick tap must not cost a stroke.
-    if(power<2){power=0;updatePower();showMessage('Hold HIT to build power',650);return;}
+    if(power<2){power=0;updatePower();return;}
     const putting=puttingMode();
     // The previous ball remains unchanged while resting. Choose the next
     // type only on an intentional release of HIT (one new type per shot).
@@ -1698,7 +1725,7 @@
       if(!playing||holeIndex!==finishedHole||roundSerial!==finishedRound||respawnSerial!==completionToken)return;
       holeWinCard.style.display='none';
       if(holeIndex>=holes.length-1)finishRound();
-      else{holeIndex++;loadHole(holeIndex,true);overlay.classList.add('hidden');showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball`,1800)}
+      else{holeIndex++;loadHole(holeIndex,true);overlay.classList.add('hidden')}
     },1550);
   }
 
@@ -1730,7 +1757,7 @@
     startCard.style.display='none';ballCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
     overlay.classList.add('hidden');
     loadHole(0,true);
-    showMessage(`${currentHole().layoutName} · ${currentTheme().label} · ${currentBall().label} ball · curves / pads / routes`,2100);
+    // Start directly into play; course and ball details stay in the fixed HUD.
   }
 
   function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
@@ -1753,7 +1780,7 @@
     terrainRollElapsed=0;preparedShotSerial=shotSerial;
     if(shotSerial>0)ballTypeReadyForShot=false;
     // A reset isn't a new shot: never shuffle the ball type here.
-    showMessage('Ball reset — ready to play',800);updateHud();
+    updateHud();
   }
   function adjustAngle(delta){
     if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
