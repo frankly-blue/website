@@ -1,0 +1,1857 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bounce Golf · Reliable Play v2</title>
+<meta name="bounce-golf-version" content="2026-10-23-reliable-play-v2">
+<style>
+  :root{--ink:#173225;--cream:#fff8e6;--green:#2f6b49;--gold:#e3aa35;--sky:#a8dcff}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:#153a2b;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);touch-action:manipulation}
+  body{display:flex;justify-content:center;min-height:100vh;padding:4px}
+  #gameShell{width:min(100%,1180px)}
+  #hud{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:7px}
+  .hudBox{background:rgba(255,248,230,.96);border-radius:11px;padding:7px 6px;text-align:center;font-weight:900;font-size:13px;box-shadow:0 2px 0 rgba(0,0,0,.13)}
+  #stage{position:relative;background:#9fd6f6;border:4px solid #f6e8bd;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+  canvas{display:block;width:100%;height:auto;background:#a8dcff}
+  #message{position:absolute;left:50%;top:12%;transform:translateX(-50%);background:rgba(255,248,230,.95);padding:8px 14px;border-radius:999px;font-weight:900;opacity:0;transition:.18s;pointer-events:none;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+  #message,#message.show{display:none!important}
+  #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(16,42,31,.78);z-index:10}
+  #overlay.hidden{display:none}
+  .card{width:min(92%,460px);background:#fff9e8;border-radius:22px;padding:22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .card h1,.card h2{margin:0 0 8px}.card p{margin:7px 0 15px;color:#4e675b;font-weight:650}
+  .card button{width:100%;margin-top:8px}
+  .victoryCard{background:linear-gradient(160deg,#fffdf3,#fff2b8);border:4px solid #e3aa35;overflow:hidden;position:relative}
+  .victoryCard:before,.victoryCard:after{content:'✦  ✧  ✦  ✧  ✦';position:absolute;left:0;right:0;color:#e3aa35;font-size:22px;letter-spacing:7px;opacity:.72;pointer-events:none}
+  .victoryCard:before{top:8px;animation:sparkle 1s ease-in-out infinite alternate}.victoryCard:after{bottom:8px;animation:sparkle 1s .35s ease-in-out infinite alternate}
+  .victoryBurst{font-size:54px;line-height:1;margin:4px 0 7px;animation:victoryPop .65s cubic-bezier(.2,.9,.25,1.35) both}
+  .victoryTitle{font-size:32px!important;color:#245f3d;text-transform:uppercase;letter-spacing:.035em}
+  .winResult{display:inline-block;margin:8px 0 5px;padding:7px 18px;border-radius:999px;background:#2d6749;color:#fff;font-size:25px;font-weight:1000;box-shadow:0 4px 0 #173b2a;animation:victoryPop .55s .12s cubic-bezier(.2,.9,.25,1.3) both}
+  .finalScoreBanner{margin:8px auto 12px;padding:9px 16px;width:max-content;max-width:100%;border-radius:14px;background:#e3aa35;color:#263320;font-size:22px;font-weight:1000;box-shadow:0 4px 0 #9d711a}
+  #endCard{max-height:92%;overflow-y:auto;padding-bottom:14px}
+  .endActions{position:sticky;bottom:-1px;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;padding:10px 0 2px;background:linear-gradient(180deg,rgba(255,247,198,0),#fff2b8 28%)}
+  .endActions button{margin:0!important;min-height:52px}
+  #endMenuBtn{background:#486154;box-shadow:0 3px 0 #28392f}
+  @keyframes victoryPop{0%{transform:scale(.3) rotate(-7deg);opacity:0}75%{transform:scale(1.12) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+  @keyframes sparkle{from{transform:translateY(-2px) scale(.92);opacity:.35}to{transform:translateY(2px) scale(1.05);opacity:.9}}
+  .difficultyLabel{font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#61766b;margin-top:12px}
+  .difficultyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:7px 0 9px}
+  .difficultyGrid .diffBtn{width:auto;min-height:46px;margin:0;background:#6b8175;box-shadow:0 3px 0 #405147;font-size:14px;padding:8px}
+  .difficultyGrid .diffBtn.selected{background:#2d6749;box-shadow:0 3px 0 #173b2a;outline:3px solid #e3aa35}
+  .ballGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 4px}
+  .ballBtn{min-height:84px!important;margin:0!important;padding:9px!important;background:#edf1e9!important;color:#20382b!important;box-shadow:0 3px 0 #b9c5b9!important;border:2px solid transparent!important;display:grid;grid-template-columns:42px 1fr;grid-template-rows:auto auto;align-items:center;text-align:left;column-gap:8px}
+  .ballBtn:active{transform:translateY(2px)}
+  .ballDot{grid-row:1/3;width:34px;height:34px;border-radius:50%;border:2px solid rgba(0,0,0,.18);box-shadow:inset -5px -6px 0 rgba(0,0,0,.09)}
+  .ballBtn strong{font-size:15px}.ballBtn small{font-size:11px;line-height:1.15;color:#5d7065;font-weight:750}
+  .ball-standard{background:#fff}.ball-heavy{background:#5f6670}.ball-bouncy{background:#ff8a2a}.ball-sticky{background:#62b84f}
+  #controls{display:grid;grid-template-columns:1fr 1.25fr;gap:7px;margin-top:8px}
+  #aimControls{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  button{border:0;border-radius:14px;min-height:58px;padding:10px 12px;font:900 16px system-ui;color:white;background:#2d6749;box-shadow:0 3px 0 #173b2a;touch-action:none}
+  button:active{transform:translateY(2px);box-shadow:0 1px 0 #173b2a}
+  #hitBtn{background:#e2ab35;color:#27301f;box-shadow:0 3px 0 #9d711a;font-size:20px}
+  #secondaryControls{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  #secondaryControls button{min-height:44px;background:#486154;font-size:14px;box-shadow:0 2px 0 #28392f}
+  #powerWrap{grid-column:1/-1;background:rgba(255,248,230,.98);border-radius:12px;padding:7px 9px}
+  #powerBar{height:12px;border-radius:999px;background:#d7d1bd;overflow:hidden}
+  #powerFill{height:100%;width:0%;background:linear-gradient(90deg,#6dbd5f,#edc24e,#dc6648)}
+  #powerText{text-align:center;font-size:12px;font-weight:900;margin-top:4px}
+  #puttPanel[hidden]{display:none!important}
+  #puttPanel{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:7px;padding-top:7px;border-top:1px solid #a9d5b3}
+  #puttReadout{flex:1;min-width:0;font-size:12px;font-weight:800;line-height:1.35;color:#254b34}
+  #controls #guideToggle{flex:none;width:auto;min-height:44px;padding:5px 12px;border:1px solid #7d9e85;border-radius:9px;background:#d4e8d3;color:#1e4a33;box-shadow:none;font-size:12px}
+  #controls #guideToggle[aria-pressed="false"]{background:#ebefec;color:#485d4f}
+  @media(max-width:375px){#puttPanel{gap:6px}#puttReadout{font-size:11px}#controls #guideToggle{padding:5px 8px}}
+  .scoregrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}.scorecell{background:#f0ead6;border-radius:10px;padding:7px;font-size:12px}.scorecell strong{display:block;font-size:18px}
+  @media (max-width:700px){
+    body{padding:0}
+    #gameShell{width:100%}
+    #stage{border-width:2px;border-radius:10px}
+    #hud{gap:3px;margin-bottom:4px}
+    .hudBox{padding:5px 3px;font-size:11px}
+  }
+  @media (max-width:700px) and (orientation:portrait){
+    canvas{aspect-ratio:48/55}
+  }
+  @media (orientation:landscape) and (max-height:650px){
+    body{padding:0}.hudBox{font-size:11px;padding:4px}.hudBox:nth-child(6){display:none}#stage{border-width:3px}
+    #controls{grid-template-columns:1fr 1.2fr;margin-top:4px;gap:5px}button{min-height:46px;font-size:14px}#hitBtn{font-size:17px}
+    #secondaryControls{display:none}#powerWrap{padding:5px}
+  }
+
+  /* Cartoon platform-game presentation, matched to the reference level art. */
+  :root{--ink:#243a36;--cream:#fff9e9;--green:#398d43;--gold:#f4c54c;--sky:#8bd5ff}
+  html,body{background:#203c3b}
+  #gameShell{max-width:1180px}
+  #hud{gap:5px;margin-bottom:5px}
+  .hudBox{background:#253944;color:#fff;border:2px solid #d2eaf3;border-radius:13px;box-shadow:0 3px 0 #10242d;padding:9px 5px;letter-spacing:.01em}
+  #stage{background:#80cffa;border:3px solid #d9f0ff;border-radius:16px;box-shadow:0 10px 0 #132e34,0 18px 34px #091d2380}
+  canvas{background:#80cffa}
+  #controls{background:#263a40;border:2px solid #77969b;border-radius:17px;padding:9px;gap:8px;margin-top:11px;box-shadow:0 4px 0 #14292e}
+  #aimControls{gap:8px}
+  #controls button{border:2px solid #b9d4cc;background:#3c7563;box-shadow:0 3px 0 #183d34}
+  #controls #hitBtn{background:#ffca4c;color:#283b30;border-color:#fff1b7;box-shadow:0 3px 0 #ac7826}
+  #controls #secondaryControls button{background:#344d56;box-shadow:0 2px 0 #152b31}
+  #powerWrap{background:#e5f5e9}
+  #message{border:2px solid #effcf6;background:#223d43;color:#fff;box-shadow:0 3px 0 #0f2930}
+  .card{border:3px solid #ecf7d9}
+  @media(max-width:700px){
+    #hud{gap:3px;margin:0 3px 4px}
+    .hudBox{font-size:10px;padding:6px 2px;border-width:1px;border-radius:8px}
+    #stage{border-width:2px;border-radius:9px}
+    #controls{margin:6px 2px 0;padding:6px;border-radius:12px;gap:6px}
+  }
+  /* The HUD may never resize the course when its text changes. */
+  #hud{grid-template-columns:repeat(6,minmax(0,1fr));width:100%;min-width:0}
+  #hud .hudBox{min-width:0;max-width:100%;height:40px;display:flex;align-items:center;
+    justify-content:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    line-height:1;font-variant-numeric:tabular-nums}
+  #ballHud{font-weight:950}
+  #gameShell,#stage,#controls{min-width:0;max-width:100%}
+  @media(max-width:700px){#hud .hudBox{height:31px;font-size:clamp(9px,2.75vw,11px)}}
+  @media(max-width:350px){#hud{gap:2px}#hud .hudBox{font-size:9px;padding:4px 1px}}
+  /* Always keep the recovery controls accessible on a small landscape phone. */
+  @media (orientation:landscape) and (max-height:650px){#secondaryControls{display:grid}}
+</style>
+</head>
+<body>
+<div id="gameShell">
+  <div id="hud">
+    <div class="hudBox" id="holeHud">Hole 1/9</div>
+    <div class="hudBox" id="parHud">Par 4</div>
+    <div class="hudBox" id="strokeHud">Strokes 0</div>
+    <div class="hudBox" id="scoreHud">Score E</div>
+    <div class="hudBox" id="dirHud">Goal ↑</div>
+    <div class="hudBox" id="ballHud">Ball Standard</div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game" width="960" height="640" aria-label="Side-view Bounce Golf course"></canvas>
+    <div id="message" aria-live="polite"></div>
+    <div id="overlay">
+      <div class="card" id="startCard">
+        <div style="font-size:50px">⛳</div>
+        <h1>Bounce Golf</h1>
+        <div style="font-size:12px;font-weight:800;color:#437253;margin:-3px 0 10px">Flat Green · Physics Rebuild v1</div>
+        <p>Nine varied landscapes every round: winding ridges, deep valleys, floating meadows, stepping stones and short rolling slopes. Each hole changes theme, and every shot gives you a different ball type.</p>
+        <div class="difficultyLabel">Choose difficulty</div>
+        <div class="difficultyGrid" id="difficultyGrid">
+          <button class="diffBtn" data-difficulty="easy">Easy</button>
+          <button class="diffBtn selected" data-difficulty="medium">Medium</button>
+          <button class="diffBtn" data-difficulty="hard">Hard</button>
+        </div>
+        <button id="startBtn">Play New 9-Hole Course</button>
+      </div>
+      <div class="card" id="ballCard" style="display:none">
+        <div style="font-size:42px">●</div>
+        <h2>Random Ball</h2>
+        <p id="ballHoleLabel">Hole 1 · the game gives you a random ball for this hole.</p>
+        <div class="ballGrid">
+          <button class="ballBtn" data-ball="standard"><span class="ballDot ball-standard"></span><strong>Standard</strong><small>Balanced flight, bounce and roll.</small></button>
+          <button class="ballBtn" data-ball="heavy"><span class="ballDot ball-heavy"></span><strong>Heavy</strong><small>Falls faster and barely bounces. Harder to climb.</small></button>
+          <button class="ballBtn" data-ball="bouncy"><span class="ballDot ball-bouncy"></span><strong>Bouncy</strong><small>Big rebounds for trick shots. Harder to control.</small></button>
+          <button class="ballBtn" data-ball="sticky"><span class="ballDot ball-sticky"></span><strong>Sticky</strong><small>Sticks to every platform face, side walls and ceiling. Never the bottom hazard!</small></button>
+        </div>
+      </div>
+      <div class="card victoryCard" id="holeWinCard" style="display:none">
+        <div class="victoryBurst">⛳✨</div>
+        <h2 class="victoryTitle" id="holeWinTitle">Hole Complete!</h2>
+        <div class="winResult" id="holeWinResult">Par!</div>
+        <p id="holeWinDetails">Nice shot.</p>
+      </div>
+      <div class="card" id="pauseCard" style="display:none">
+        <h2>Paused</h2>
+        <button id="continueBtn">Continue</button>
+        <button id="restartHoleBtn">Restart Hole</button>
+        <button id="titleBtn">Title Screen</button>
+      </div>
+      <div class="card victoryCard" id="endCard" style="display:none">
+        <div class="victoryBurst">🏆✨</div>
+        <h2 class="victoryTitle" id="endTitle">Victory!</h2>
+        <div class="finalScoreBanner" id="finalScoreBanner">Score E</div>
+        <p id="endSummary"></p>
+        <div id="scoreGrid" class="scoregrid"></div>
+        <div class="endActions">
+          <button id="againBtn">New Game</button>
+          <button id="endMenuBtn">Main Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div id="aimControls">
+      <button id="leftBtn">◀ AIM</button>
+      <button id="rightBtn">AIM ▶</button>
+    </div>
+    <button id="hitBtn">HOLD TO HIT</button>
+    <div id="powerWrap"><div id="powerBar"><div id="powerFill"></div></div><div id="powerText">Power 0%</div>
+      <div id="puttPanel" hidden><span id="puttReadout">Hold HIT to preview your putt</span><button type="button" id="guideToggle" aria-pressed="true">Guide: On</button></div>
+    </div>
+    <div id="secondaryControls"><button id="resetBtn">Reset Ball</button><button id="pauseBtn">Pause</button></div>
+  </div>
+</div>
+<script>
+(()=>{
+  const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+  // Portrait phones use a taller, almost-square course. Tablets/desktop stay wide.
+  const phonePortrait=window.matchMedia('(max-width:700px) and (orientation:portrait)').matches;
+  canvas.width=960;
+  canvas.height=phonePortrait?1100:640;
+  const W=canvas.width,H=canvas.height;
+  const holeHud=document.getElementById('holeHud'),parHud=document.getElementById('parHud'),strokeHud=document.getElementById('strokeHud'),scoreHud=document.getElementById('scoreHud'),dirHud=document.getElementById('dirHud'),ballHud=document.getElementById('ballHud');
+  const message=document.getElementById('message'),overlay=document.getElementById('overlay');
+  const startCard=document.getElementById('startCard'),ballCard=document.getElementById('ballCard'),holeWinCard=document.getElementById('holeWinCard'),pauseCard=document.getElementById('pauseCard'),endCard=document.getElementById('endCard');
+  const startBtn=document.getElementById('startBtn'),againBtn=document.getElementById('againBtn'),endMenuBtn=document.getElementById('endMenuBtn'),continueBtn=document.getElementById('continueBtn'),restartHoleBtn=document.getElementById('restartHoleBtn'),titleBtn=document.getElementById('titleBtn');
+  const leftBtn=document.getElementById('leftBtn'),rightBtn=document.getElementById('rightBtn'),hitBtn=document.getElementById('hitBtn'),resetBtn=document.getElementById('resetBtn'),pauseBtn=document.getElementById('pauseBtn');
+  const puttPanel=document.getElementById('puttPanel'),puttReadout=document.getElementById('puttReadout'),guideToggle=document.getElementById('guideToggle');
+  const powerFill=document.getElementById('powerFill'),powerText=document.getElementById('powerText'),endSummary=document.getElementById('endSummary'),endTitle=document.getElementById('endTitle'),finalScoreBanner=document.getElementById('finalScoreBanner'),scoreGrid=document.getElementById('scoreGrid'),ballHoleLabel=document.getElementById('ballHoleLabel'),holeWinTitle=document.getElementById('holeWinTitle'),holeWinResult=document.getElementById('holeWinResult'),holeWinDetails=document.getElementById('holeWinDetails');
+  const difficultyBtns=[...document.querySelectorAll('.diffBtn')];
+  const ballBtns=[...document.querySelectorAll('.ballBtn')];
+
+  const GRAVITY=760, BALL_R=10, MAX_SPEED=950;
+  // A ball can only rest on grass when its centre is properly above the island.
+  // Corner contact on its own is not enough to suspend an ordinary ball.
+  const EDGE_INSET=3;
+
+  let holes=[];
+
+  let holeIndex=0,strokes=0,totalScore=0,results=[],playing=false,paused=false;
+  let ball={x:0,y:0,vx:0,vy:0,moving:false,grounded:false,rollGroup:null,rollSpeed:null,rollReversals:0,lastRollDirection:0,
+    ignoreTerrainGroup:null,ignoreTerrainTime:0,attached:null,lost:false,sinking:false,holed:false,onGreen:false,puttingShot:false,sinkStart:0,sinkSurfaceY:0};
+  let angle=-Math.PI/4,power=0,charging=false,chargeStart=0,chargeRAF=null;
+  let lastTime=performance.now(),restTimer=0,lastSafe={x:0,y:0,onGreen:false,attached:null};
+  let selectedDifficulty='medium';
+  let selectedBallType='standard',lastPlayedBallType=null,choosingBall=false,lossEffect=null,guideEnabled=true,wasPuttingMode=false;
+  let shotSerial=0,preparedShotSerial=0,roundSerial=0,respawnSerial=0,flightSeconds=0;
+  let ballTypeReadyForShot=true,terrainRollElapsed=0;
+
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  const randInt=(a,b)=>Math.floor(rand(a,b+1));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+
+  const difficultySettings={
+    easy:{count:[3,5],width:[155,225],gap:[32,62],jitterY:32,maxStep:122,height:[68,118],label:'Easy'},
+    medium:{count:[3,6],width:[125,205],gap:[45,88],jitterY:62,maxStep:150,height:[70,142],label:'Medium'},
+    hard:{count:[4,7],width:[96,170],gap:[58,108],jitterY:92,maxStep:182,height:[62,138],label:'Hard'}
+  };
+
+  const ballTypes={
+    standard:{label:'Standard',color:'#ffffff',stroke:'#c7d0cc',gravity:1,launch:1,grassBounce:.82,wallBounce:.92,landingGrip:1,rollDecay:.987,putt:1,cupSpeed:165},
+    heavy:{label:'Heavy',color:'#5f6670',stroke:'#3f454d',gravity:1.32,launch:.88,grassBounce:.30,wallBounce:.70,landingGrip:.97,rollDecay:.983,putt:.93,cupSpeed:150},
+    bouncy:{label:'Bouncy',color:'#ff8a2a',stroke:'#c75f0e',gravity:.94,launch:1.03,grassBounce:1.45,wallBounce:1.18,landingGrip:1,rollDecay:.989,putt:1.08,cupSpeed:138},
+    sticky:{label:'Sticky',color:'#62b84f',stroke:'#397c31',gravity:1,launch:.97,grassBounce:.12,wallBounce:.76,landingGrip:.68,rollDecay:.955,putt:.78,cupSpeed:190}
+  };
+
+
+  const themes={
+    classic:{label:'Classic',skyTop:'#6fc8ff',skyBottom:'#c8f0ff',cloud:'rgba(255,255,255,.86)',mountain1:'#6cb5c4',mountain2:'#399d9d',soil1:'#b8864e',soil2:'rgba(190,105,55,.45)',soilShade:'rgba(100,49,31,.20)',crack:'rgba(92,49,31,.45)',grass1:'#238b35',grass2:'#84d832',tuft:'#2f7b2a',trunk:'#70452c',leaf1:'#4d8f2f',leaf2:'#73b83a',stem:'#39763b',petal1:'#ffd85a',petal2:'#a774df',center:'#f7b94b',hazardKind:'water',hazardDepth:60,hazard1:'#2f84db',hazard2:'#60c9f7',hazardFoam:'rgba(255,255,255,.8)',lossText:'Splash! Ball lost — stroke counts',effectColor:'#bdefff',surface:'Normal grass',groundBounce:1,landingGrip:1,rollDecay:1,puttSpeed:1,wallBounce:1,cupCatch:1},
+    snowy:{label:'Snowy',skyTop:'#b8dbff',skyBottom:'#eef7ff',cloud:'rgba(255,255,255,.8)',mountain1:'#d6e5ef',mountain2:'#b6c9d6',soil1:'#7f8c97',soil2:'rgba(195,210,220,.35)',soilShade:'rgba(85,104,121,.22)',crack:'rgba(96,108,121,.28)',grass1:'#eef4f8',grass2:'#ffffff',tuft:'#dce9f2',trunk:'#6a5b50',leaf1:'#52734f',leaf2:'#86a98d',stem:'#7ca19f',petal1:'#d7f2ff',petal2:'#ffffff',center:'#f2cc73',hazardKind:'icewater',hazardDepth:62,hazard1:'#4eb7f1',hazard2:'#baf0ff',hazardFoam:'rgba(255,255,255,.9)',lossText:'Splosh! Lost in icy water — stroke counts',effectColor:'#e6fbff',surface:'Slippery snow',groundBounce:.92,landingGrip:.99,rollDecay:1.008,puttSpeed:1.08,wallBounce:1.04,cupCatch:1.08},
+    desert:{label:'Desert',skyTop:'#ffd194',skyBottom:'#ffe9be',cloud:'rgba(255,244,210,.6)',mountain1:'#d9a06b',mountain2:'#b97645',soil1:'#b8763d',soil2:'rgba(255,204,130,.22)',soilShade:'rgba(112,67,29,.18)',crack:'rgba(120,70,32,.35)',grass1:'#ddb45d',grass2:'#f1d387',tuft:'#b79037',trunk:'#8f6431',leaf1:'#73a24c',leaf2:'#9dcc68',stem:'#8a7a2f',petal1:'#ffdd79',petal2:'#ff9d57',center:'#fff2b5',hazardKind:'sand',hazardDepth:58,hazard1:'#d6b04f',hazard2:'#f0d57c',hazardFoam:'rgba(255,243,205,.6)',lossText:'Buried in sand — stroke counts',effectColor:'#f5e4ae',surface:'Soft sand',groundBounce:.48,landingGrip:.70,rollDecay:.965,puttSpeed:.76,wallBounce:.88,cupCatch:1.10},
+    jungle:{label:'Jungle',skyTop:'#6ad0c8',skyBottom:'#d9f6db',cloud:'rgba(255,255,255,.65)',mountain1:'#6eb39a',mountain2:'#3e7a63',soil1:'#755233',soil2:'rgba(117,82,51,.38)',soilShade:'rgba(54,33,18,.22)',crack:'rgba(64,40,20,.38)',grass1:'#2b994c',grass2:'#59d062',tuft:'#1e7d35',trunk:'#5f3b1f',leaf1:'#1f8740',leaf2:'#57b760',stem:'#2d8d41',petal1:'#ffdb57',petal2:'#ff5f9d',center:'#fff3a0',hazardKind:'swamp',hazardDepth:60,hazard1:'#355f2a',hazard2:'#68a646',hazardFoam:'rgba(201,232,128,.45)',lossText:'Plop! Swallowed by the swamp — stroke counts',effectColor:'#c5ef7f',surface:'Grippy jungle turf',groundBounce:.68,landingGrip:.84,rollDecay:.982,puttSpeed:.88,wallBounce:.92,cupCatch:1.06},
+    autumn:{label:'Autumn',skyTop:'#ffd5a3',skyBottom:'#fff0cc',cloud:'rgba(255,250,235,.7)',mountain1:'#d7b08f',mountain2:'#b98661',soil1:'#8d5a39',soil2:'rgba(171,116,73,.32)',soilShade:'rgba(86,52,31,.18)',crack:'rgba(96,58,37,.38)',grass1:'#bf7d2e',grass2:'#e3a445',tuft:'#9c5f19',trunk:'#6b432a',leaf1:'#cb6d27',leaf2:'#e5b23b',stem:'#7a5f2f',petal1:'#ffdd81',petal2:'#d36a5a',center:'#fff0ba',hazardKind:'river',hazardDepth:60,hazard1:'#547fc9',hazard2:'#7ec6ef',hazardFoam:'rgba(255,255,255,.7)',lossText:'Splash! Into the river — stroke counts',effectColor:'#dbf5ff',surface:'Leafy turf',groundBounce:.86,landingGrip:.91,rollDecay:.992,puttSpeed:.94,wallBounce:.97,cupCatch:1.03},
+    volcano:{label:'Volcanic',skyTop:'#40354a',skyBottom:'#1f1a22',cloud:'rgba(255,180,130,.18)',mountain1:'#64525e',mountain2:'#3c3238',soil1:'#54484e',soil2:'rgba(120,98,104,.24)',soilShade:'rgba(20,17,19,.28)',crack:'rgba(255,120,60,.22)',grass1:'#7b7274',grass2:'#9f9498',tuft:'#685f63',trunk:'#4d3831',leaf1:'#6b4f3d',leaf2:'#8c6a53',stem:'#8a5a35',petal1:'#ff8a52',petal2:'#f2d15b',center:'#ffe8a0',hazardKind:'lava',hazardDepth:64,hazard1:'#ff5a1f',hazard2:'#ffb027',hazardFoam:'rgba(255,214,125,.55)',lossText:'Burned up in lava — stroke counts',effectColor:'#ffd36b',surface:'Hard volcanic rock',groundBounce:1.28,landingGrip:1.02,rollDecay:1.002,puttSpeed:1.04,wallBounce:1.12,cupCatch:.94}
+  };
+  const themeKeys=Object.keys(themes);
+  const ballKeys=Object.keys(ballTypes);
+  const shuffle=a=>{const arr=[...a];for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;};
+  const randomBallKey=()=>ballKeys[randInt(0,ballKeys.length-1)];
+  // Choose the next shot's ball from the other three types. Never repeat
+  // the type used for the preceding shot, even when the ball is on the green.
+  const randomNextBallKey=previous=>{
+    const choices=ballKeys.filter(key=>key!==previous);
+    return choices[randInt(0,choices.length-1)];
+  };
+  const currentTheme=(h=currentHole())=>themes[h?.theme||'classic'];
+
+  const backdropChoices={
+    classic:['hills','coast','city','mountains','forest'],
+    snowy:['snowfield','forest','mountains','frozenLake'],
+    desert:['dunes','mesas','openDesert'],
+    jungle:['canopy','forest','hills'],
+    autumn:['forest','hills','lake','city'],
+    volcano:['volcano','darkHills','ashPlain']
+  };
+  const terrainBlueprints=[
+    {key:'wildValley',name:'Wild Valley',sky:'sunset',falls:false,
+      forms:[{x:.035,w:.61,z:.78,shape:'valley'},{x:.49,w:.47,z:.47,shape:'crest'},{x:.11,w:.60,z:.16,shape:'soft'}],
+      shortcuts:[[0,1]],bridge:[],props:'trees'},
+    {key:'waterfallWalk',name:'Waterfall Walk',sky:'sunset',falls:true,
+      forms:[{x:.045,w:.49,z:.12,shape:'bowl'},{x:.48,w:.46,z:.33,shape:'ripple'},
+             {x:.12,w:.62,z:.58,shape:'swoop'},{x:.51,w:.45,z:.84,shape:'soft'}],
+      shortcuts:[[1,2]],bridge:[[0,1]],props:'waterfall'},
+    {key:'skyArches',name:'Sky Arches',sky:'blue',falls:false,
+      forms:[{x:.04,w:.55,z:.76,shape:'swoop'},{x:.33,w:.61,z:.42,shape:'arch'},
+             {x:.51,w:.45,z:.13,shape:'soft'}],
+      shortcuts:[[0,1]],bridge:[],props:'arches'},
+    {key:'rockyCrossing',name:'Rocky Crossing',sky:'blue',falls:false,
+      forms:[{x:.51,w:.43,z:.83,shape:'ridge'},{x:.07,w:.56,z:.61,shape:'bowl'},
+             {x:.46,w:.47,z:.39,shape:'valley'},{x:.09,w:.54,z:.13,shape:'soft'}],
+      shortcuts:[[0,1],[2,3]],bridge:[[1,2]],props:'boulders'},
+    {key:'rollingMeadow',name:'Rolling Meadow',sky:'morning',falls:false,
+      forms:[{x:.045,w:.82,z:.70,shape:'ripple'},{x:.56,w:.40,z:.39,shape:'ridge'},
+             {x:.16,w:.62,z:.12,shape:'soft'}],
+      shortcuts:[[0,2]],bridge:[],props:'meadows'},
+    {key:'floatingGardens',name:'Floating Gardens',sky:'mint',falls:false,
+      forms:[{x:.04,w:.39,z:.87,shape:'bowl'},{x:.27,w:.46,z:.66,shape:'crest'},
+             {x:.55,w:.40,z:.43,shape:'swoop'},{x:.24,w:.54,z:.17,shape:'soft'}],
+      shortcuts:[[0,1],[1,2]],bridge:[[2,3]],props:'gardens'},
+    {key:'brokenCoast',name:'Broken Coast',sky:'ocean',falls:true,
+      forms:[{x:.51,w:.44,z:.12,shape:'arch'},{x:.07,w:.59,z:.34,shape:'valley'},
+             {x:.48,w:.45,z:.58,shape:'ripple'},{x:.055,w:.55,z:.84,shape:'soft'}],
+      shortcuts:[[0,1]],bridge:[[2,3]],props:'waterfall'},
+    {key:'summitLoop',name:'Summit Loop',sky:'sunset',falls:false,
+      forms:[{x:.06,w:.53,z:.62,shape:'ridge'},{x:.38,w:.56,z:.15,shape:'bowl'},
+             {x:.10,w:.65,z:.91,shape:'soft'}],
+      shortcuts:[[0,2]],bridge:[],props:'boulders'},
+    {key:'windingRiver',name:'Winding River',sky:'morning',falls:true,
+      forms:[{x:.05,w:.78,z:.17,shape:'ripple'},{x:.12,w:.54,z:.41,shape:'swoop'},
+             {x:.48,w:.47,z:.60,shape:'crest'},{x:.24,w:.56,z:.83,shape:'soft'}],
+      shortcuts:[[0,1],[1,2]],bridge:[[0,1]],props:'waterfall'}
+  ];
+  const layoutTypes=terrainBlueprints.map(t=>t.key);
+  const randomBackdrop=themeKey=>{
+    const a=backdropChoices[themeKey]||['hills'];
+    return a[randInt(0,a.length-1)];
+  };
+  // Every cup platform is a true putting green: consistent grass physics in all worlds.
+  // All putting greens have identical friction, regardless of their world.
+  // Purposeful putts use a flat, constant-resistance green. Integrating
+  // v(t) exactly ensures the preview and the actual roll agree at any FPS.
+  // v^2 = 2 * friction * travel; power maps LINEARLY to distance, not speed.
+  const AIR_DRAG=.998;
+  const GREEN_ROLL_DECAY=.982; // Shorter natural green landing roll; deliberate putts use their separate calibrated model.
+  const GREEN_REST_SPEED=11;
+  const PUTT_DECELERATION=360; // Pixels per second squared.
+  const PUTT_CUP_MAX_SPEED=255; // Ordinary rolls drop; only very fast passes skip the cup.
+  const PUTT_CUP_RADIUS=10; // Smaller than the drawn cup; no magnetic suction.
+  const greenSurface={surface:'Putting green',groundBounce:.14,landingGrip:1,rollDecay:.998,puttSpeed:1,wallBounce:1,cupCatch:1.25};
+  function supportPlatform(x=ball.x,y=ball.y){
+    if(!holes.length||!Number.isFinite(x)||!Number.isFinite(y))return null;
+    const h=currentHole();
+    // Resting balls follow the smooth interpolated terrain, NOT the small
+    // straight collision segments. Testing them against those segments made
+    // some settled balls falsely appear unsupported and endlessly restart.
+    if(ball.rollGroup!==null){
+      const group=h.terrainGroups?.find(g=>g.id===ball.rollGroup);
+      if(group&&x>=group.x+EDGE_INSET&&x<=group.x+group.w-EDGE_INSET){
+        const surface=smoothTerrain(group,x);
+        if(Math.abs(y-terrainCenterY(surface))<=7){
+          return group.pieces.find(p=>x>=p.x-.5&&x<=p.x+p.w+.5)||group.pieces[0]||null;
+        }
+      }
+    }
+    // When on the green, resolve its own single level collider first, even
+    // if a different island overlaps the same horizontal coordinates.
+    if(ball.onGreen){
+      const green=h.terrainGroups?.at(-1)?.greenPiece;
+      if(green&&x>=green.x+EDGE_INSET&&x<=green.x+green.w-EDGE_INSET&&
+         Math.abs(y-(green.y-BALL_R))<=8)return green;
+    }
+    return h.platforms.find(p=>{
+      if(x<p.x+EDGE_INSET||x>p.x+p.w-EDGE_INSET)return false;
+      if(p.terrainSegment){
+        const group=h.terrainGroups?.find(g=>g.id===p.terrainGroup);
+        if(group&&Math.abs(y-terrainCenterY(smoothTerrain(group,x)))<=7)return true;
+      }
+      if(p.isSlope){
+        const s=p.dy/p.w,L=Math.hypot(1,s);
+        const topY=p.y+s*(x-p.x);
+        return Math.abs(y-(topY-BALL_R*L))<9;
+      }
+      return Math.abs((y+BALL_R)-p.y)<10;
+    })||null;
+  }
+  const onGreenPlatform=()=>ball.onGreen&&supportPlatform()===cupPlatform();
+  const surfacePhysics=()=>ball.onGreen&&(onGreenPlatform()||supportPlatform()?.isApronSlope)?greenSurface:currentTheme();
+  function activatePuttingGreen(){
+    if(ball.onGreen)return;
+    ball.onGreen=true;
+    ball.greenLandingBounceUsed=false;
+    ball.puttingShot=false;
+    ball.attached=null;
+    // Keep the shot's ball colour and type. Only its movement switches to
+    // consistent, ordinary grass physics; do not make it white or stop it.
+    // Keep the playfield quiet: no inter-shot message overlays.
+    updateHud();
+  }
+
+  // A true airborne arrival gets ONE small, controlled hop before rolling.
+  // Every ball type uses the same green bounce, but keeps its own colour.
+  // Gentle roll-ins from the apron, stationary balls and putts do not bounce.
+  function greenLandingRebound(platform,impact){
+    if(platform!==cupPlatform()||!ball.onGreen||ball.puttingShot||
+       ball.greenLandingBounceUsed||impact<150)return 0;
+    ball.greenLandingBounceUsed=true;
+    return -clamp(impact*.30,80,140); // about 5–16 px of hop height
+  }
+
+
+  function addBouncePad(p){
+    if(!p||p.isSlope||p.isGreen||p.isCrate)return;
+    const padW=Math.max(40,Math.min(58,p.w-18));
+    p.bouncePad={rel:clamp(rand(.30,.70),.22,.78),w:padW,power:rand(330,405)};
+    p.bouncePad.x=p.x+p.w*p.bouncePad.rel;
+  }
+
+  function onBouncePad(p,x=ball.x){
+    return !!(p&&p.bouncePad&&x>=p.bouncePad.x-p.bouncePad.w*.5&&x<=p.bouncePad.x+p.bouncePad.w*.5);
+  }
+
+  function addAlternativeRoute(platforms,from,to){
+    const steps=Math.random()<.55?2:1;
+    const innerLeft=Math.max(from.x,to.x)+28;
+    const innerRight=Math.min(from.x+from.w,to.x+to.w)-28;
+    if(innerRight-innerLeft<110)return [];
+    const span=innerRight-innerLeft;
+    const made=[];
+    for(let s=0;s<steps;s++){
+      const t=(s+1)/(steps+1);
+      const w=rand(80,122);
+      const x=clamp(innerLeft+span*t-w*.5+rand(-15,15),innerLeft,innerRight-w);
+      const y=lerp(from.exitY,to.y,t)+rand(-8,8)-14;
+      const p={x,y,w,h:24,flowers:false,isAltRoute:true,trees:[],dir:from.dir};
+      made.push(p);
+    }
+    if(made.length)made[made.length-1].routeHint=true;
+    platforms.push(...made);
+    return made;
+  }
+
+  function launchBouncePad(p){
+    const dir=Math.abs(ball.vx)>20?Math.sign(ball.vx):(p.dir||1);
+    const boost=(p.bouncePad?.power)||360;
+    ball.x=clamp(ball.x,p.x+BALL_R,p.x+p.w-BALL_R);
+    ball.y=p.y-BALL_R;
+    ball.attached=null; ball.rollGroup=null;ball.rollSpeed=null;ball.rollReversals=0;ball.lastRollDirection=0;
+    ball.ignoreTerrainGroup=null;ball.ignoreTerrainTime=0;
+    ball.grounded=false; ball.moving=true;
+    ball.vy=-boost;
+    ball.vx=clamp(ball.vx*.62 + dir*boost*.19,-280,280);
+    restTimer=0;
+    showMessage('Bounce pad!',550);
+  }
+
+  // A landmass is one organically outlined rock body, but its physical top is
+  // made of short, smooth, contiguous slopes. Artwork and colliders share points.
+  const landformShapes={
+    valley:[[0,0],[.19,0],[.34,37],[.49,49],[.65,2],[.80,-23],[1,0]],
+    crest:[[0,0],[.18,0],[.34,-34],[.49,-48],[.68,-14],[.84,18],[1,0]],
+    soft:[[0,0],[.15,0],[.30,21],[.49,8],[.65,-18],[.82,0],[1,0]],
+    bowl:[[0,0],[.20,0],[.35,44],[.49,53],[.65,29],[.81,-13],[1,0]],
+    ripple:[[0,0],[.17,0],[.31,29],[.45,-21],[.63,34],[.79,-17],[1,0]],
+    swoop:[[0,0],[.20,0],[.40,50],[.55,43],[.72,-24],[.85,-14],[1,0]],
+    arch:[[0,0],[.16,0],[.32,-30],[.51,-48],[.71,-16],[.86,12],[1,0]],
+    ridge:[[0,0],[.20,0],[.36,-43],[.51,-23],[.68,24],[.84,10],[1,0]]
+  };
+  const terrainSky={
+    sunset:{top:'#ffd37c',bottom:'#fff1bd',mount:'#f3b587',far:'#ffd6a0',sea:'#8ed5e5'},
+    blue:{top:'#8dd8ff',bottom:'#dbf4ff',mount:'#9bbdce',far:'#c8e4e9',sea:'#66b8e3'},
+    morning:{top:'#acdfff',bottom:'#f2fad6',mount:'#a5c9b0',far:'#d9e7c4',sea:'#69bdda'},
+    mint:{top:'#8adcca',bottom:'#e4f8dd',mount:'#7caea2',far:'#b6dac6',sea:'#58b3be'},
+    ocean:{top:'#a1dfff',bottom:'#eff5ed',mount:'#8ab5c9',far:'#c5d6ca',sea:'#4aafe5'}
+  };
+
+  function sampleLandY(points,t){
+    if(t<=points[0][0])return points[0][1];
+    for(let k=0;k<points.length-1;k++){
+      const a=points[k],b=points[k+1];
+      if(t<=b[0]+1e-7){const u=clamp((t-a[0])/(b[0]-a[0]),0,1),smooth=u*u*(3-2*u);
+        return lerp(a[1],b[1],smooth);}
+    }
+    return points[points.length-1][1];
+  }
+
+  function createLandmass(spec,ordinal,count,reverse,difficulty,baseY,variation){
+    const x=spec.x*W+variation.x,w=spec.w*W+variation.w;
+    const dir=reverse?-1:1;
+    const green=ordinal===count-1;
+    const depth=(H>720?(count>=4?69:76):(count>=4?41:62))+rand(-4,5);
+    // The ENTIRE final island is a single horizontal putting green, including
+    // its entrance. Never apply the curving terrain profile or an apron dip to
+    // any section of this landmass. Its artwork and collision surface match.
+    if(green){
+      const y=baseY;
+      const greenPiece={x,y,w,h:depth,dy:0,isSlope:false,
+        terrainSegment:true,terrainGroup:ordinal,isGreen:true,
+        dir,flowers:false,ordinal};
+      const startU=.105,endU=.94;
+      const startX=x+(dir===1?startU:1-startU)*w;
+      const exitX=x+(dir===1?endU:1-endU)*w;
+      return {
+        id:ordinal,x,y,w,dir,
+        points:[{x,y},{x:x+w,y}],
+        pieces:[greenPiece],greenPiece,depth,
+        startX,startY:y,exitX,exitY:y,
+        isGreen:true,skySeed:variation.seed
+      };
+    }
+    // Earlier islands keep their individually generated hills, valleys and
+    // natural slopes. The final island has already returned as one flat green.
+    const knots=(spec.horizontalLevel
+      ? [[0,0],[1,0]]
+      : (landformShapes[spec.shape]||landformShapes.valley).map(q=>[q[0],q[1]*variation.curve]));
+    if(!green&&ordinal>0&&ordinal<count-1){
+      // Deliberately provide a broad, flat launch/landing terrace on some
+      // middle islands so a springboard has usable space in front and behind.
+      const original=knots[1][0],plateau=.35;
+      for(let k=1;k<knots.length;k++){
+        knots[k][0]=plateau+(knots[k][0]-original)*(1-plateau)/(1-original);
+      }
+    }
+    const surface=u=>baseY+sampleLandY(knots,u);
+    const steps=Math.max(12,Math.ceil(w/18));
+    const locals=[];
+    for(let i=0;i<=steps;i++){
+      const u=i/steps;
+      locals.push([u,surface(u)]);
+    }
+    locals.sort((a,b)=>a[0]-b[0]);
+    // Collider points match the visible non-green terrain contour.
+    const pts=locals.map(([u,y])=>({x:dir===1?x+u*w:x+(1-u)*w,y})).sort((a,b)=>a.x-b.x);
+    const pieces=[];
+    const add=(a,b,greenPiece=false)=>{
+      if(b-a<1)return;
+      const xA=dir===1?x+a:x+w-b;
+      const yA=surface(a/w),yB=surface(b/w);
+      const leftY=dir===1?yA:yB,rightY=dir===1?yB:yA;
+      const dy=rightY-leftY;
+      const flat=greenPiece||Math.abs(dy)<.30;
+      const p={x:xA,y:leftY,w:b-a,h:depth,dy:flat?0:dy,
+        isSlope:!flat,terrainSegment:true,terrainGroup:ordinal,
+        isGreen:greenPiece,dir,flowers:false,ordinal};
+      if(flat){
+        p.y=(leftY+rightY)*.5;
+        if(!greenPiece&&ordinal>0&&ordinal<count-1&&a/w<.21)p.padCandidate=true;
+      }
+      // Join flat stretches into one collider; a springboard never ends up
+      // stranded on a tiny polygon in the middle of a curve.
+      const last=pieces[pieces.length-1];
+      if(last&&flat&&!greenPiece&&!last.isGreen&&!last.isSlope&&
+         Math.abs(last.y-p.y)<.15&&Math.abs(last.x+last.w-p.x)<.02){last.w+=p.w;return;}
+      pieces.push(p);
+    };
+    // Add in physical left-to-right order, so flat pieces merge correctly.
+    const nonGreenSegments=[];
+    for(let i=0;i<locals.length-1;i++){
+      const a=locals[i],b=locals[i+1];
+      nonGreenSegments.push([a[0]*w,b[0]*w]);
+    }
+    if(dir===-1)nonGreenSegments.reverse();
+    for(const [a,b] of nonGreenSegments){
+      if(b-a>1)add(a,b);
+    }
+    pieces.sort((a,b)=>a.x-b.x);
+    const startU=.105,endU=.94;
+    const startX=x+(dir===1?startU:1-startU)*w;
+    const exitX=x+(dir===1?endU:1-endU)*w;
+    const group={id:ordinal,x,y:baseY,w,dir,points:pts,pieces,depth,
+      startX,startY:surface(startU),exitX,exitY:surface(endU),
+      isGreen:green,skySeed:variation.seed};
+    return group;
+  }
+
+  function drawLandmass(g){
+    const pts=g.points;if(!pts?.length)return;
+    const start=pts[0],end=pts[pts.length-1];
+    const rock='#583b35',rockShadow='#3b292b',rockLight='#765044';
+    ctx.save();ctx.beginPath();ctx.moveTo(start.x,start.y);
+    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.lineTo(end.x+2,end.y+g.depth*.66);
+    const bottom=[];
+    for(let i=pts.length-1;i>=0;i-=3){
+      const p=pts[i],u=(p.x-g.x)/g.w;
+      const bulge=7*Math.sin(u*Math.PI*3+g.skySeed)+8*Math.sin(u*Math.PI);
+      bottom.push({x:p.x,y:p.y+g.depth+bulge});
+    }
+    if(bottom[bottom.length-1]?.x!==start.x)bottom.push({x:start.x,y:start.y+g.depth});
+    for(const p of bottom)ctx.lineTo(p.x,p.y);
+    ctx.closePath();ctx.fillStyle=rock;ctx.strokeStyle=rockShadow;ctx.lineWidth=4;ctx.lineJoin='round';ctx.fill();ctx.stroke();
+    ctx.clip();
+    // Faceted rock details, deliberately scattered rather than tiled bricks.
+    let seed=(g.id+11)*1237+(g.skySeed||1)*71;
+    const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+    const patches=Math.max(7,Math.round(g.w/36));
+    for(let i=0;i<patches;i++){
+      const px=g.x+17+rnd()*(g.w-32);
+      const ix=Math.min(pts.length-1,Math.round((px-g.x)/g.w*(pts.length-1)));
+      const py=pts[ix].y+17+rnd()*Math.max(13,g.depth-12);
+      const r=8+rnd()*16;
+      ctx.fillStyle=rnd()>.35?rockLight:'#463031';ctx.globalAlpha=.43+rnd()*.25;
+      ctx.beginPath();ctx.moveTo(px-r,py-r*.25);ctx.lineTo(px-r*.15,py-r*.60);
+      ctx.lineTo(px+r*.75,py-r*.18);ctx.lineTo(px+r,py+r*.48);
+      ctx.lineTo(px-r*.4,py+r*.56);ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+    ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();ctx.moveTo(start.x,start.y);
+    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.strokeStyle='#315e24';ctx.lineWidth=18;ctx.stroke();
+    ctx.strokeStyle='#76d328';ctx.lineWidth=12;ctx.stroke();
+    ctx.strokeStyle='#a5ee3a';ctx.lineWidth=4;ctx.stroke();
+    ctx.restore();
+    // A few distinctive plants, away from the tee and cup.
+    if(!g.isGreen){
+      const count=g.w>490?3:2;
+      for(let j=0;j<count;j++){
+        const u=.28+j*.27;
+        const x=g.x+u*g.w,y=terrainY(g,x);
+        if(g.id%3===1&&j===1)drawTree(x,y-9,g.w>500?.64:.46);
+        else drawBush(x,y-8,.34+(j%2)*.09);
+      }
+    }
+  }
+
+  function terrainY(group,x){
+    const pts=group.points;
+    if(x<=pts[0].x)return pts[0].y;
+    for(let i=0;i<pts.length-1;i++)if(x<=pts[i+1].x){
+      const a=pts[i],b=pts[i+1];return lerp(a.y,b.y,clamp((x-a.x)/(b.x-a.x),0,1));
+    }
+    return pts[pts.length-1].y;
+  }
+
+  function drawBouncePad(p){
+    if(!p.bouncePad)return;
+    const cx=p.bouncePad.x,pw=p.bouncePad.w,py=p.y-11;
+    ctx.save();ctx.strokeStyle='#713a63';ctx.lineWidth=3;
+    ctx.fillStyle='#fb6b92';ctx.beginPath();ctx.roundRect(cx-pw/2,py,pw,9,4);ctx.fill();ctx.stroke();
+    for(let k=0;k<3;k++){
+      ctx.beginPath();ctx.arc(cx,py+11+k*3,6-k*.6,.15,Math.PI*.85);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawBridge(p){
+    ctx.save();ctx.strokeStyle='#674029';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(p.x,p.y+7);ctx.lineTo(p.x+p.w,p.y+7);ctx.stroke();
+    for(let bx=p.x+3;bx<p.x+p.w-7;bx+=15){
+      ctx.fillStyle='#be8349';ctx.fillRect(bx,p.y-3,12,11);
+      ctx.strokeStyle='#6c4534';ctx.strokeRect(bx,p.y-3,12,11);
+    }
+    ctx.strokeStyle='#87623f';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(p.x,p.y-16);ctx.quadraticCurveTo(p.x+p.w/2,p.y-1,p.x+p.w,p.y-16);ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawWaterfall(h){
+    const f=h.waterfall;if(!f)return;
+    ctx.save();const wobble=Math.sin(performance.now()/490)*2;
+    ctx.fillStyle='rgba(29,128,223,.62)';ctx.beginPath();
+    ctx.moveTo(f.x-10,f.top);ctx.bezierCurveTo(f.x-7+wobble,f.top+22,f.x-12,f.bottom-17,f.x-14,f.bottom);
+    ctx.lineTo(f.x+16,f.bottom);ctx.bezierCurveTo(f.x+10,f.bottom-22,f.x+12+wobble,f.top+22,f.x+9,f.top);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(229,255,255,.83)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(f.x-3,f.top+8);ctx.lineTo(f.x+wobble,f.bottom-7);ctx.stroke();
+    ctx.fillStyle='#d7f6ff';for(let j=0;j<5;j++){
+      const x=f.x+(j-2)*8,y=f.bottom+Math.sin(j*3)*2;
+      ctx.beginPath();ctx.arc(x,y,3+j%2,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  }
+  function generateHole(idx,difficulty,themeKey,layoutType){
+    const template=terrainBlueprints.find(t=>t.key===layoutType)||terrainBlueprints[0];
+    const flip=Math.random()<.46;
+    const top=H>720?124:105,bottom=H-themes[themeKey].hazardDepth-(H>720?96:88);
+    // Spread physical height bands far enough apart for real ball clearance,
+    // regardless of whether this blueprint climbs, descends or loops back.
+    const sortedHeights=template.forms.map(f=>f.z).sort((a,b)=>a-b);
+    const levels=template.forms.map(f=>{
+      const rank=sortedHeights.indexOf(f.z);
+      const z=.045+.91*rank/(template.forms.length-1);
+      return top+z*(bottom-top);
+    });
+    const groups=[],platforms=[],transitions=[],slopes=[],mainPlatforms=[];
+    const variance=rand(.96,1.04);
+    const levelCount=template.forms.length;
+    const levelLeft=32, levelWidth=W-64;
+    // The course is now a stack of broad, side-to-side levels. Each level
+    // reaches almost the full screen width; the route alternates left/right
+    // so a visible ramp always provides a way up to the next tier.
+    const levelOrder=template.forms.map((f,i)=>i).sort((a,b)=>template.forms[a].z-template.forms[b].z);
+    const physicalLevelY=template.forms.map((_,i)=>{
+      const rank=levelOrder.indexOf(i);
+      return bottom-(rank/(levelCount-1))*(bottom-top);
+    });
+    const rampEnds=[];
+    for(let i=0;i<levelCount;i++){
+      const spec={...template.forms[i],x:levelLeft/W,w:levelWidth/W,horizontalLevel:true,shape:'soft'};
+      const next=template.forms[i+1];
+      // Alternate the ramp side so players traverse across one level, climb,
+      // then travel back across the next one.
+      const dir=(i%2===0)?1:-1;
+      const local={x:0,w:0,curve:0,seed:idx*19+i*73+11};
+      const group=createLandmass(spec,i,levelCount,dir<0,difficulty,physicalLevelY[i],local);
+      group.horizontalLevel=true;
+      group.dir=dir;
+      // Set exact flat top surface and matching collider for every non-green tier.
+      if(!group.isGreen){
+        group.points=[{x:group.x,y:physicalLevelY[i]},{x:group.x+group.w,y:physicalLevelY[i]}];
+        group.pieces=[{x:group.x,y:physicalLevelY[i],w:group.w,h:group.depth,dy:0,isSlope:false,
+          terrainSegment:true,terrainGroup:i,isGreen:false,dir,flowers:false,ordinal:i}];
+        group.startY=group.exitY=physicalLevelY[i];
+        group.startX=dir===1?group.x+42:group.x+group.w-42;
+        group.exitX=dir===1?group.x+group.w-42:group.x+42;
+      }
+      groups.push(group);platforms.push(...group.pieces);mainPlatforms.push(...group.pieces);
+      slopes.push(...group.pieces.filter(p=>p.isSlope));
+    }
+    // Add a solid, traversable ramp at alternating ends between every pair
+    // of levels. It touches both level edges and is not a floating island.
+    for(let i=0;i<groups.length-1;i++){
+      const from=groups[i],to=groups[i+1];
+      const rampX=(i%2===0)?W-100:32;
+      const rampW=68;
+      const upperY=Math.min(from.startY,to.startY), lowerY=Math.max(from.startY,to.startY);
+      const ramp={x:rampX,y:upperY,w:rampW,h:22,dy:lowerY-upperY,isSlope:true,
+        terrainSegment:true,isConnector:true,dir:i%2===0?1:-1,flowers:false,ordinal:i};
+      platforms.push(ramp);transitions.push(ramp);slopes.push(ramp);
+      from.exitX=i%2===0?W-42:42;
+      from.exitY=from.startY;
+      to.startX=i%2===0?W-42:42;
+      to.startY=to.startY;
+    }
+    // The only transitions are the deliberate ramps joining adjacent
+    // side-to-side levels; don't add floating shortcut islands or bridges.
+    // A spring is deliberately placed only on a long, stationary, level
+    // middle-island terrace, with >=40px clear grass on either side.
+    const padCandidates=shuffle(platforms.filter(p=>p.terrainSegment&&!p.isConnector&&p.w>=180&&
+      p.ordinal>0&&p.ordinal<groups.length-1&&!p.motion&&!p.isSlope&&!p.isGreen));
+    if(padCandidates.length&&Math.random()<.65){
+      const p=padCandidates[0];
+      const safe=52,center=p.x+p.w*.53;
+      const cx=clamp(center,p.x+safe,p.x+p.w-safe);
+      p.bouncePad={rel:(cx-p.x)/p.w,x:cx,w:43,power:rand(340,400),safePlacement:true};
+    }
+    // Flip the entire terrain, including its collision surfaces and scenery,
+    // to vary direction without reusing an identical visual silhouette.
+    if(flip){
+      for(const p of platforms){
+        p.x=W-p.x-p.w;
+        if(p.isSlope){p.y+=p.dy;p.dy=-p.dy;}
+        if(p.dir)p.dir=-p.dir;
+        if(p.bouncePad){p.bouncePad.x=W-p.bouncePad.x;p.bouncePad.rel=1-p.bouncePad.rel;}
+        if(p.motion){p.baseX=W-p.baseX-p.w;p.prevX=p.x;}
+      }
+      for(const g of groups){
+        g.x=W-g.x-g.w;g.dir=-g.dir;
+        g.startX=W-g.startX;g.exitX=W-g.exitX;
+        g.points=g.points.map(p=>({x:W-p.x,y:p.y})).reverse();
+      }
+    }
+    const first=groups[0],last=groups[groups.length-1];
+    const green=last.greenPiece;
+    const cupX=green.x+green.w*(last.dir===1?.72:.28);
+    const par=(difficulty==='easy'?groups.length+1:groups.length+2)+(template.key==='rockyCrossing'?1:0);
+    const scenery=template.sky;
+    let waterfall=null;
+    if(template.falls){
+      const upper=groups.slice(0,-1).find((g,i)=>g.startY<groups[i+1].startY-38);
+      if(upper){const lower=groups.find(g=>g.startY>upper.startY+65&&
+        g.x<upper.x+upper.w*.75&&g.x+g.w>upper.x+upper.w*.25);
+        if(lower){
+          const wx=clamp(upper.x+upper.w*.55,lower.x+35,lower.x+lower.w-35);
+          waterfall={x:wx,top:terrainY(upper,wx)+upper.depth*.48,bottom:terrainY(lower,wx)-8};
+          if(waterfall.bottom-waterfall.top<35)waterfall=null;
+        }
+      }
+    }
+    return {par,theme:themeKey,backdrop:randomBackdrop(themeKey),layout:levels[0]>levels.at(-1)?'uphill':'downhill',
+      layoutKey:template.key,layoutName:template.name,scenery,waterfall,terrainGroups:groups,
+      firstDirection:first.dir,ballType:randomBallKey(),
+      tiers:groups.map(g=>({x:g.x,y:g.startY,w:g.w,dir:g.dir,parts:g.pieces,exitY:g.exitY})),
+      transitions,slopes,start:{x:first.startX,y:first.startY},
+      cup:{x:cupX,y:green.y},mainPlatforms,platforms,greenWidth:green.w};
+  }
+
+  function generateCourse(difficulty){
+    let themeOrder=[];while(themeOrder.length<9)themeOrder=themeOrder.concat(shuffle(themeKeys));
+    let layoutOrder=[];while(layoutOrder.length<9)layoutOrder=layoutOrder.concat(shuffle(layoutTypes));
+    themeOrder=themeOrder.slice(0,9);layoutOrder=layoutOrder.slice(0,9);
+    return Array.from({length:9},(_,i)=>generateHole(i,difficulty,themeOrder[i],layoutOrder[i]));
+  }
+
+  function setDifficulty(difficulty){
+    selectedDifficulty=difficulty;
+    difficultyBtns.forEach(b=>b.classList.toggle('selected',b.dataset.difficulty===difficulty));
+  }
+
+  const currentHole=()=>holes[holeIndex];
+
+  function initDynamicPlatforms(h=currentHole()){
+    if(!h||!h.platforms)return;
+    for(const p of h.platforms){
+      if(!p.motion)continue;
+      p.baseX ??= p.x; p.baseY ??= p.y;
+      p.prevX = p.x; p.prevY = p.y;
+      p.motion.phase ??= rand(0,Math.PI*2);
+    }
+  }
+
+  function updateMovingPlatforms(dt){
+    const h=currentHole(); if(!h||!h.platforms)return;
+    const support=engineState==='ledge'?supportedLedge:
+      (!ball.lost&&!ball.sinking&&!ball.holed&&engineState==='stuck')?ball.attachedPlatform:
+      (!ball.moving&&!ball.lost&&!ball.sinking&&!ball.holed)?(ball.restingPlatform||supportPlatform()):null;
+    const now=performance.now()/1000;
+    for(const p of h.platforms){
+      if(!p.motion)continue;
+      p.prevX=p.x; p.prevY=p.y;
+      const t=now*(p.motion.speed||1)+(p.motion.phase||0);
+      p.x=p.baseX+(p.motion.axis==='x'?Math.sin(t)*(p.motion.amp||0):0);
+      p.y=p.baseY+(p.motion.axis==='y'?Math.sin(t)*(p.motion.amp||0):0);
+      if(p.bouncePad)p.bouncePad.x=p.x+p.w*(p.bouncePad.rel||.5);
+      if(support===p){
+        const dx=p.x-p.prevX,dy=p.y-p.prevY;
+        ball.x+=dx; ball.y+=dy;
+        lastSafe.x+=dx; lastSafe.y+=dy;
+      }
+    }
+  }
+  const currentBall=()=>ballTypes[selectedBallType];
+  // On the green every ball MOVES like Standard but retains its own artwork.
+  const movementBall=()=>ball.onGreen?ballTypes.standard:currentBall();
+  const speed=()=>Math.hypot(ball.vx,ball.vy);
+  function prepareNextShot(message='Ready for next shot'){
+    // Finishing a shot only unlocks the controls. Do not change the ball while
+    // it is resting; select the new type exactly once at the NEXT real shot.
+    if(preparedShotSerial===shotSerial||ball.sinking||ball.holed||!playing)return false;
+    preparedShotSerial=shotSerial;
+    ballTypeReadyForShot=false;
+    showMessage(message,850);
+    updateHud();
+    return true;
+  }
+  const scoreText=n=>n===0?'E':n>0?'+'+n:String(n);
+  function showMessage(t,ms=1000){message.textContent='';message.classList.remove('show');clearTimeout(showMessage.t)}
+
+  function loadHole(idx,resetStrokes=true){
+    holeIndex=idx; if(resetStrokes)strokes=0;
+    engineState='ready';physicsDebt=rollingElapsed=0;supportedLedge=null;
+    const h=currentHole();
+    selectedBallType=lastPlayedBallType?randomNextBallKey(lastPlayedBallType):(h.ballType||randomBallKey());
+    respawnSerial++;flightSeconds=0;preparedShotSerial=shotSerial;
+    ballTypeReadyForShot=true;terrainRollElapsed=0;
+    const teeGroup=h.terrainGroups?.[0];
+    const teePoint=teeGroup?smoothTerrain(teeGroup,h.start.x):null;
+    ball.x=h.start.x;ball.y=teePoint?terrainCenterY(teePoint):h.start.y-BALL_R;
+    ball.vx=ball.vy=0;ball.moving=false;ball.grounded=true;ball.rollGroup=teeGroup?.id??null;ball.rollSpeed=0;ball.rollReversals=0;ball.lastRollDirection=0;
+    ball.ignoreTerrainGroup=null;ball.ignoreTerrainTime=0;ball.attached=null;ball.restingPlatform=null;ball.lost=false;ball.sinking=false;ball.holed=false;ball.onGreen=false;ball.greenLandingBounceUsed=false;ball.puttingShot=false;ball.cupPassMissed=false;
+    lastSafe={x:ball.x,y:ball.y,onGreen:false,attached:null,rollGroup:ball.rollGroup};restTimer=0;lossEffect=null;
+    // Every hole starts at a true 45-degree launch angle, towards the cup.
+    const facingRight=(h.firstDirection||1)===1;
+    angle=facingRight?-Math.PI/4:-3*Math.PI/4;
+    power=0;updatePower();updateHud();
+    initDynamicPlatforms(h);
+    // A clear on-screen indicator shows the opening aim, even on a phone.
+    dirHud.textContent=facingRight?'Aim 45° ↗':'Aim 45° ↖';
+  }
+
+  function updateHud(){
+    const h=currentHole();
+    holeHud.textContent=`Hole ${holeIndex+1}/9`;
+    parHud.textContent=`Par ${h.par}`;
+    strokeHud.textContent=`Strokes ${strokes}`;
+    scoreHud.textContent=`Score ${scoreText(totalScore)}`;
+    const deg=Math.round(Math.atan2(-Math.sin(angle),Math.abs(Math.cos(angle)))*180/Math.PI);
+    dirHud.textContent=!ball.moving?`Aim ${deg}° ${Math.cos(angle)<0?'←':'→'}`:
+      h.cup.y<ball.y?'Goal ↑':h.cup.y>ball.y?'Goal ↓':'Goal →';
+    // Short, stable label; full details are available by long-press/hover.
+    ballHud.textContent=currentBall().label;
+    ballHud.title=`${currentBall().label} ball · ${ball.onGreen?'Green':ball.attached?`Stuck on ${ball.attached}`:currentTheme().label}`;
+    parHud.title=`Par ${h.par} · ${difficultySettings[selectedDifficulty].label}`;
+    dirHud.title=onGreenPlatform()?'Normal putting green':currentTheme().surface;
+    updateControlMode();
+    updatePower();
+  }
+
+  function puttPreview(){
+    if(!puttingMode())return null;
+    const green=cupPlatform();
+    const dir=Math.cos(angle)<0?-1:1;
+    const travel=green.w*power/100;
+    const stopX=ball.x+dir*travel;
+    const distanceToHole=dir*(currentHole().cup.x-ball.x);
+    const edge=dir>0?green.x+green.w:green.x;
+    const offGreen=dir>0?stopX>edge-EDGE_INSET:stopX<edge+EDGE_INSET;
+    return {green,dir,travel,stopX,distanceToHole,edge,offGreen};
+  }
+
+  function updatePower(){
+    powerFill.style.width=power+'%';
+    const putting=playing&&puttingMode();
+    puttPanel.hidden=!putting;
+    if(!putting){powerText.textContent=`Power ${Math.round(power)}%`;return;}
+    const preview=puttPreview();
+    powerText.textContent=`Putt ${Math.round(power)}% · ${Math.round(preview.travel)} / ${Math.round(preview.green.w)} distance`;
+    const holeDistance=Math.abs(currentHole().cup.x-ball.x);
+    if(power<2){puttReadout.textContent=`Hole ${Math.round(holeDistance)} px away · hold HIT to preview`;return;}
+    if(preview.distanceToHole<0){puttReadout.textContent=`Aiming away · ~${Math.round(preview.travel)} px roll`;return;}
+    const difference=preview.travel-preview.distanceToHole;
+    const result=preview.offGreen?' · off green':Math.abs(difference)<=8?' · near cup':difference>0?` · ~${Math.round(difference)} px long`:` · ~${Math.round(-difference)} px short`;
+    puttReadout.textContent=`Hole ${Math.round(holeDistance)} px · roll ~${Math.round(preview.travel)} px${result}`;
+  }
+
+  function drawBackground(){
+    const h=currentHole(),s=terrainSky[h.scenery||'blue'],th=currentTheme();
+    const sky=ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0,s.top);sky.addColorStop(.78,s.bottom);sky.addColorStop(1,s.bottom);
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    // Soft sun and drifting clouds make the sky feel deep even on phones.
+    ctx.save();ctx.globalAlpha=.5;ctx.fillStyle='#fff9de';ctx.beginPath();
+    ctx.arc((h.layoutKey==='waterfallWalk'?.21:.81)*W,H*.17,H>720?45:35,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,.82)';
+    for(const c of [[110,H*.17,.9],[480,H*.13,.6],[805,H*.23,.95]]){
+      const [x,y,k]=c;ctx.beginPath();ctx.ellipse(x,y,46*k,15*k,0,0,Math.PI*2);
+      ctx.ellipse(x-24*k,y+4*k,24*k,10*k,0,0,Math.PI*2);
+      ctx.ellipse(x+29*k,y+4*k,29*k,11*k,0,0,Math.PI*2);ctx.fill();
+    }
+    ctx.save();ctx.fillStyle=s.far;ctx.globalAlpha=.7;ctx.beginPath();ctx.moveTo(0,H*.79);
+    for(let i=0;i<=W;i+=120){const y=H*(.69+Math.sin(i*.009+h.par)*.045);ctx.lineTo(i,y);}
+    ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fill();ctx.restore();
+    ctx.fillStyle=s.mount;ctx.globalAlpha=.62;ctx.beginPath();ctx.moveTo(0,H*.90);
+    for(let i=0;i<=W;i+=90)ctx.lineTo(i,H*(.81+Math.cos(i*.011+h.par)*.07));
+    ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fill();ctx.globalAlpha=1;
+    if(h.scenery==='ocean'||h.scenery==='sunset'||h.scenery==='blue'){
+      ctx.fillStyle=s.sea;ctx.globalAlpha=.55;ctx.fillRect(0,H*.84,W,H*.16);
+      ctx.globalAlpha=.23;ctx.strokeStyle='#e8ffff';ctx.lineWidth=3;
+      for(let j=0;j<7;j++){
+        const y=H*.855+j*H*.016;
+        ctx.beginPath();ctx.moveTo(26+j*19,y);ctx.lineTo(145+j*22,y);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(480+j*13,y+5);ctx.lineTo(590+j*26,y+5);ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    }
+    drawHazard(th);
+  }
+
+  function drawHazard(th){
+    const top=H-th.hazardDepth;
+    const g=ctx.createLinearGradient(0,top,0,H);g.addColorStop(0,th.hazard2);g.addColorStop(1,th.hazard1);ctx.fillStyle=g;ctx.fillRect(0,top,W,th.hazardDepth);
+    ctx.fillStyle=th.hazardFoam;
+    const n=performance.now()/1000;
+    for(let x=-40;x<=W+40;x+=38){
+      const y=top+5+Math.sin(n*2.2+x*.03)*2.5;
+      if(th.hazardKind==='lava'){ctx.beginPath();ctx.arc(x,y+6,8+Math.sin(n*3+x*.02)*2,0,Math.PI*2);ctx.fill();}
+      else if(th.hazardKind==='sand'){ctx.fillRect(x,top+1+Math.sin(n*2+x*.05)*2,24,4);}
+      else if(th.hazardKind==='swamp'){ctx.beginPath();ctx.ellipse(x,y+7,10,4,0,0,Math.PI*2);ctx.fill();}
+      else{ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.arc(x+8,y+2,5,0,Math.PI*2);ctx.fill();}
+    }
+  }
+
+  function drawLossEffect(){
+    if(!lossEffect)return;
+    const t=(performance.now()-lossEffect.start)/700;
+    if(t>=1){lossEffect=null;return;}
+    const p=1-t;
+    ctx.save();ctx.globalAlpha=Math.max(.05,p);ctx.fillStyle=lossEffect.color;ctx.strokeStyle=lossEffect.color;
+    if(lossEffect.kind==='lava'){
+      for(let i=0;i<7;i++){const dx=(i-3)*9;ctx.beginPath();ctx.arc(lossEffect.x+dx*p*.4,lossEffect.y-22*t-Math.abs(i-3)*3*t,4+p*10*(1-Math.abs(i-3)/4),0,Math.PI*2);ctx.fill();}
+    }else if(lossEffect.kind==='sand'){
+      for(let i=0;i<9;i++){const dx=(i-4)*10;ctx.beginPath();ctx.arc(lossEffect.x+dx*.7,lossEffect.y-8*t-(i%2)*5,3+p*6,0,Math.PI*2);ctx.fill();}
+    }else{
+      for(let i=0;i<8;i++){const ang=(-Math.PI*.9)+(i/7)*Math.PI*1.8;ctx.beginPath();ctx.arc(lossEffect.x+Math.cos(ang)*28*t,lossEffect.y-Math.sin(ang)*14*p,3+p*6,0,Math.PI*2);ctx.fill();}
+    }
+    ctx.restore();
+  }
+
+  function roundedRectPath(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+  }
+
+  function inkStroke(color='#3e563b',width=2){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineJoin='round';ctx.lineCap='round';}
+  function drawBush(x,y,s=1){
+    const th=currentTheme();ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+    const dark=th.label==='Snowy'?'#577c7c':th.label==='Desert'?'#758d45':th.label==='Autumn'?'#9e542e':'#166d39';
+    const light=th.label==='Snowy'?'#b4e1d9':th.label==='Desert'?'#a3b25a':th.label==='Autumn'?'#f1aa40':'#58c844';
+    inkStroke(dark,3);ctx.fillStyle=dark;ctx.beginPath();
+    ctx.moveTo(-36,0);ctx.quadraticCurveTo(-42,-17,-28,-22);ctx.quadraticCurveTo(-27,-37,-12,-30);
+    ctx.quadraticCurveTo(0,-46,13,-31);ctx.quadraticCurveTo(32,-39,36,-20);
+    ctx.quadraticCurveTo(46,-12,37,0);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle=light;for(const [bx,by,br] of [[-21,-15,14],[-3,-23,17],[20,-15,14]]){
+      ctx.beginPath();ctx.arc(bx,by,br,Math.PI,0);ctx.lineTo(bx+br,0);ctx.lineTo(bx-br,0);ctx.closePath();ctx.fill();
+    }
+    ctx.strokeStyle=dark;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-30,-9);ctx.quadraticCurveTo(-17,-15,-10,-9);ctx.moveTo(2,-23);ctx.quadraticCurveTo(10,-29,17,-22);ctx.stroke();
+    ctx.restore();
+  }
+  function drawTree(x,y,s=1){
+    const th=currentTheme();ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+    inkStroke('#694b2e',3);ctx.fillStyle=th.trunk;
+    ctx.beginPath();ctx.moveTo(-10,2);ctx.bezierCurveTo(-7,-28,-18,-52,-28,-62);
+    ctx.lineTo(-20,-67);ctx.quadraticCurveTo(-7,-56,-1,-48);
+    ctx.quadraticCurveTo(7,-72,23,-77);ctx.lineTo(27,-70);
+    ctx.quadraticCurveTo(10,-57,10,-42);ctx.lineTo(13,2);ctx.closePath();ctx.fill();ctx.stroke();
+    const dark=th.label==='Snowy'?'#527c72':th.label==='Autumn'?'#b2672e':th.label==='Desert'?'#729c49':'#127e46';
+    const light=th.label==='Snowy'?'#b1dfc8':th.label==='Autumn'?'#e9a33b':th.label==='Desert'?'#b7c967':'#66c943';
+    inkStroke('#255e3d',3);ctx.fillStyle=dark;
+    for(const [cx,cy,r] of [[-29,-77,31],[-5,-91,36],[27,-77,32],[-3,-65,32]]){
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+    }
+    ctx.fillStyle=light;
+    for(const [cx,cy,r] of [[-39,-89,16],[-9,-109,20],[19,-95,19],[32,-70,14],[-18,-64,16]]){
+      ctx.beginPath();ctx.arc(cx,cy,r,Math.PI*1.05,Math.PI*1.92);ctx.quadraticCurveTo(cx+5,cy+4,cx-r*.6,cy+4);ctx.closePath();ctx.fill();
+    }
+    if(th.label==='Snowy'){
+      ctx.fillStyle='#f5ffff';for(const [cx,cy] of [[-38,-104],[-10,-124],[21,-107]]){
+        ctx.beginPath();ctx.ellipse(cx,cy,17,5,-.2,0,Math.PI*2);ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  function drawFlower(x,y,phase=0){
+    const th=currentTheme();ctx.strokeStyle=th.stem;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-9);ctx.stroke();
+    ctx.fillStyle=phase%2?th.petal1:th.petal2;
+    for(let a=0;a<5;a++){ctx.beginPath();ctx.arc(x+Math.cos(a*1.256)*3,y-11+Math.sin(a*1.256)*3,2.2,0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle=th.center;ctx.beginPath();ctx.arc(x,y-11,2,0,Math.PI*2);ctx.fill();
+  }
+  function drawCrate(p){
+    const x=p.x,y=p.y,w=p.w,h=p.h;ctx.save();
+    ctx.fillStyle='#9b4f22';inkStroke('#4c2c20',2.5);
+    ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h);
+    ctx.fillStyle='#ca7d3b';ctx.fillRect(x+4,y+4,w-8,h-8);
+    ctx.strokeStyle='#68381e';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(x+5,y+5);ctx.lineTo(x+w-5,y+h-5);
+    ctx.moveTo(x+w-5,y+5);ctx.lineTo(x+5,y+h-5);ctx.stroke();
+    ctx.strokeRect(x+5,y+5,w-10,h-10);
+    ctx.fillStyle='#e6a45c';ctx.fillRect(x+5,y+5,w-10,3);
+    ctx.restore();
+  }
+  function drawLadder(x,top,bottom){
+    if(bottom-top<28)return;
+    ctx.save();inkStroke('#523f26',3);ctx.strokeStyle='#634123';
+    ctx.beginPath();ctx.moveTo(x-17,top);ctx.lineTo(x-17,bottom);
+    ctx.moveTo(x+17,top);ctx.lineTo(x+17,bottom);ctx.stroke();
+    ctx.strokeStyle='#e3b364';ctx.lineWidth=6;
+    for(let y=top+10;y<bottom-4;y+=16){ctx.beginPath();ctx.moveTo(x-18,y);ctx.lineTo(x+18,y);ctx.stroke();}
+    ctx.strokeStyle='#694421';ctx.lineWidth=1.6;
+    for(let y=top+10;y<bottom-4;y+=16){ctx.beginPath();ctx.moveTo(x-18,y+2);ctx.lineTo(x+18,y+2);ctx.stroke();}
+    ctx.restore();
+  }
+  function drawDirectionSign(x,y,dir){
+    ctx.save();ctx.translate(x,y);ctx.scale(dir,1);
+    ctx.lineJoin='round';
+    ctx.fillStyle='#70452b';ctx.strokeStyle='#243339';ctx.lineWidth=3;
+    ctx.fillRect(-4,-29,8,31);ctx.strokeRect(-4,-29,8,31);
+    // Higher-contrast route arrows against grass, snow and desert scenery.
+    ctx.fillStyle='#ffbe36';ctx.strokeStyle='#213842';ctx.lineWidth=4;
+    ctx.beginPath();ctx.moveTo(-26,-34);ctx.lineTo(7,-34);
+    ctx.lineTo(7,-43);ctx.lineTo(33,-23);ctx.lineTo(7,-3);
+    ctx.lineTo(7,-13);ctx.lineTo(-26,-13);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.strokeStyle='#fff1a3';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(-21,-27);ctx.lineTo(8,-27);ctx.stroke();
+    ctx.restore();
+  }
+  function drawSlope(p){
+    const th=currentTheme();
+    const {x,y,w,h,dy}=p;
+    const soil=th.label==='Snowy'?'#b6c7d5':th.label==='Volcanic'?'#66565b':'#c39354';
+    const stone=th.label==='Snowy'?'#edf8fa':th.label==='Volcanic'?'#9f898a':'#f8d395';
+    const grass=p.isApronSlope?'#88d85b':th.grass2;
+    ctx.save();
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y+dy);
+    ctx.lineTo(x+w,y+dy+h);ctx.lineTo(x,y+h);ctx.closePath();
+    ctx.fillStyle=soil;ctx.fill();ctx.strokeStyle='#795b3d';ctx.lineWidth=2.2;ctx.stroke();ctx.clip();
+    ctx.strokeStyle=stone;ctx.lineWidth=5;
+    for(let yy=y+10;yy<y+Math.max(90,h+Math.abs(dy));yy+=13){
+      for(let xx=x+9;xx<x+w+9;xx+=24){
+        const v=Math.sin(xx*.17+yy*.23)*3;
+        ctx.beginPath();ctx.moveTo(xx,yy+v);ctx.lineTo(xx+12,yy+4+v);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.strokeStyle='#285f34';ctx.lineWidth=18;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y+dy);ctx.stroke();
+    ctx.strokeStyle=grass;ctx.lineWidth=11;
+    ctx.beginPath();ctx.moveTo(x,y-2);ctx.lineTo(x+w,y+dy-2);ctx.stroke();
+    // Small grass tufts reinforce that this is playable ground, not a ramp object.
+    ctx.strokeStyle='#2d7b35';ctx.lineWidth=2;
+    for(let t=.16;t<.9;t+=.22){
+      const gx=x+w*t,gy=y+dy*t-7;
+      ctx.beginPath();ctx.moveTo(gx-5,gy+5);ctx.lineTo(gx-1,gy-3);
+      ctx.moveTo(gx,gy+5);ctx.lineTo(gx+2,gy-5);
+      ctx.moveTo(gx+4,gy+5);ctx.lineTo(gx+9,gy-1);ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawPlatform(p){
+    if(p.isCrate){drawCrate(p);return;}
+    if(p.isSlope){drawSlope(p);return;}
+    const th=currentTheme(),x=p.x,y=p.y,w=p.w,h=p.h;
+    const isGreen=!!p.isGreen,isApron=!!p.isApron;
+    // Golden, hand-drawn stone islands with darker edges and individually
+    // highlighted stones. All artwork uses the SAME collision rectangles.
+    const snowy=th.label==='Snowy',volcanic=th.label==='Volcanic',desert=th.label==='Desert';
+    // Unified grass-on-rock visual language; worlds vary mainly through sky,
+    // scenery and hazards so the course itself always reads clearly.
+    const rockBase='#a86f42';
+    const rockLight='#f7d69a';
+    const rockMid='#dca86b';
+    const rockDark='#795034';
+    ctx.save();ctx.fillStyle=rockBase;inkStroke(rockDark,2.5);
+    roundedRectPath(x,y,w,h,Math.min(8,h*.14));ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.rect(x+3,y+6,Math.max(0,w-6),Math.max(0,h-9));ctx.clip();
+    const tw=26,thh=22,rows=Math.ceil(h/thh)+1,cols=Math.ceil(w/tw)+2;
+    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+      const sx=x+col*tw+(row%2?tw*.5:-tw*.1);
+      const sy=y+8+row*thh;
+      const noise=Math.sin(col*73.1+row*37.7+x*.123+y*.079);
+      const sw=tw-3+noise*2,sh=thh-2+noise*2;
+      ctx.fillStyle=(col+row)%3===0?rockLight:rockMid;
+      inkStroke(rockDark,1.15);
+      ctx.beginPath();ctx.moveTo(sx+3,sy+1);ctx.lineTo(sx+sw-5,sy+1);
+      ctx.quadraticCurveTo(sx+sw+1,sy+3,sx+sw-1,sy+sh-6);
+      ctx.lineTo(sx+sw-6,sy+sh);ctx.lineTo(sx+5,sy+sh-1);
+      ctx.quadraticCurveTo(sx-1,sy+sh-5,sx+3,sy+1);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,240,.78)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(sx+6,sy+5);ctx.lineTo(sx+sw-8,sy+5);ctx.stroke();
+    }
+    ctx.restore();
+    // Saturated grass silhouette, scalloped underside and bright highlight.
+    const grassDark=isGreen?'#246c3b':isApron?'#328145':'#248c39';
+    const grassLight=isGreen?'#a5ed6c':isApron?'#7ed259':'#79dc43';
+    ctx.save();inkStroke('#285c32',2.6);ctx.fillStyle=grassDark;
+    ctx.beginPath();ctx.moveTo(x,y-7);ctx.lineTo(x+w,y-7);ctx.lineTo(x+w,y+10);
+    for(let px=x+w;px>=x;px-=13){ctx.quadraticCurveTo(px-5,y+16,Math.max(x,px-13),y+9);}
+    ctx.lineTo(x,y-7);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle=grassLight;ctx.beginPath();ctx.moveTo(x+3,y-7);
+    for(let px=x+5;px<x+w-4;px+=20){ctx.quadraticCurveTo(px+7,y-11,Math.min(px+20,x+w-4),y-7);}
+    ctx.lineTo(x+w-4,y-1);ctx.lineTo(x+3,y-1);ctx.closePath();ctx.fill();
+    if(isGreen){ctx.fillStyle='rgba(235,255,198,.28)';for(let gx=x+20;gx<x+w-15;gx+=37)ctx.fillRect(gx,y-6,15,6);}
+    if(!isGreen){
+      ctx.strokeStyle=th.tuft;ctx.lineWidth=2.2;
+      for(let gx=x+11;gx<x+w-9;gx+=29){ctx.beginPath();ctx.moveTo(gx-6,y-7);ctx.lineTo(gx-10,y-15);ctx.moveTo(gx-2,y-7);ctx.lineTo(gx,y-17);ctx.moveTo(gx+3,y-7);ctx.lineTo(gx+10,y-13);ctx.stroke();}
+    }
+    ctx.restore();
+    // Bushes and trees sit behind the ball and never count as hazards.
+    if(p.trees){for(const f of p.trees)drawTree(x+w*f,y-8,w>220?.65:.53);}
+    else if(!isGreen&&w>145&&!p.isApron&&((Math.floor(x+y)%3)!==0))drawBush(x+w*.72,y-7,.42);
+    if(p.isBonus)drawBush(x+w*.32,y-8,.44);
+    if(p.bouncePad){
+      const cx=p.bouncePad.x,pw=p.bouncePad.w,py=y-9;
+      ctx.save();
+      ctx.fillStyle='#3e5cff';ctx.strokeStyle='#1930a3';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.roundRect(cx-pw/2,py,pw,12,5);ctx.fill();ctx.stroke();
+      ctx.strokeStyle='#fff8c9';ctx.lineWidth=2;
+      for(let sx=cx-pw/2+10;sx<cx+pw/2-8;sx+=12){ctx.beginPath();ctx.moveTo(sx,py+11);ctx.lineTo(sx+4,py+3);ctx.lineTo(sx+8,py+11);ctx.stroke();}
+      ctx.restore();
+    }
+    if(p.motion){
+      ctx.save();ctx.globalAlpha=.82;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.fillStyle='rgba(77,151,255,.95)';ctx.lineWidth=2.2;
+      const my=y-18,mx=x+w*.5;
+      if(p.motion.axis==='x'){
+        ctx.beginPath();ctx.moveTo(mx-18,my);ctx.lineTo(mx+18,my);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(mx-18,my);ctx.lineTo(mx-10,my-5);ctx.lineTo(mx-10,my+5);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(mx+18,my);ctx.lineTo(mx+10,my-5);ctx.lineTo(mx+10,my+5);ctx.closePath();ctx.fill();
+      }else{
+        ctx.beginPath();ctx.moveTo(mx,my-10);ctx.lineTo(mx,my+10);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(mx,my-10);ctx.lineTo(mx-5,my-2);ctx.lineTo(mx+5,my-2);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(mx,my+10);ctx.lineTo(mx-5,my+2);ctx.lineTo(mx+5,my+2);ctx.closePath();ctx.fill();
+      }
+      ctx.restore();
+    }
+    if(p.isAltRoute&&!p.motion){
+      ctx.save();ctx.fillStyle='rgba(255,255,255,.9)';ctx.beginPath();ctx.arc(x+w*.5,y-16,5,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
+    if(p.flowers&&!p.isApron){
+      const count=Math.min(3,Math.max(1,Math.floor(w/95)));
+      for(let i=0;i<count;i++)drawFlower(x+24+i*(w-48)/Math.max(1,count-1),y-7,i+Math.floor(x));
+    }
+  }
+
+  function cupSurfaceY(h=currentHole()){
+    const candidates=h.platforms.filter(p=>p.isGreen&&h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
+    if(!candidates.length)return h.cup.y;
+    let best=candidates[0],bestDist=Math.abs(best.y-h.cup.y);
+    for(const p of candidates){const d=Math.abs(p.y-h.cup.y);if(d<bestDist){best=p;bestDist=d;}}
+    return best.y;
+  }
+
+  function cupPlatform(h=currentHole()){
+    const candidates=h.platforms.filter(p=>p.isGreen&&h.cup.x>=p.x+8&&h.cup.x<=p.x+p.w-8);
+    if(!candidates.length)return null;
+    let best=candidates[0],bestDist=Math.abs(best.y-h.cup.y);
+    for(const p of candidates){const d=Math.abs(p.y-h.cup.y);if(d<bestDist){best=p;bestDist=d;}}
+    return best;
+  }
+
+  function puttingMode(){
+    if(ball.moving||ball.sinking||ball.lost)return false;
+    // Touching the side of the cup island is not landing on the putting green.
+    if(ball.attached&&ball.attached!=='top')return false;
+    const p=cupPlatform();
+    if(!p)return false;
+    // A ball that only grazes the corner must not enter putting mode.
+    return supportPlatform()===p;
+  }
+
+  function updateControlMode(){
+    const putting=puttingMode();
+    leftBtn.textContent=putting?'PUTT ←':'◀ AIM';
+    rightBtn.textContent=putting?'PUTT →':'AIM ▶';
+    hitBtn.textContent=putting?'HOLD TO PUTT':'HOLD TO HIT';
+    if(putting){
+      // Default towards the hole only when putting becomes available. Never
+      // overwrite a left/right selection that the player makes afterwards.
+      if(!wasPuttingMode)angle=ball.x>currentHole().cup.x?Math.PI:0;
+      dirHud.textContent=Math.cos(angle)<0?'Putt ←':'Putt →';
+    }
+    wasPuttingMode=putting;
+  }
+
+  function drawCup(){
+    const h=currentHole(),x=h.cup.x,y=cupSurfaceY(h);
+    // The cup is cut into the grass surface, not floating above it.
+    ctx.save();
+    ctx.fillStyle='#151515';ctx.beginPath();ctx.ellipse(x,y-1,16,4.8,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#f6f2df';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y-2);ctx.lineTo(x,y-53);ctx.stroke();
+    ctx.fillStyle='#e84d4d';ctx.beginPath();ctx.moveTo(x,y-53);ctx.lineTo(x+30,y-44);ctx.lineTo(x,y-34);ctx.closePath();ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBall(){
+    if(ball.lost||ball.holed)return;
+    let drawY=ball.y,r=BALL_R,alpha=1;
+    if(ball.sinking){
+      const t=clamp((performance.now()-ball.sinkStart)/430,0,1);
+      drawY=ball.y+t*15;
+      r=BALL_R*(1-t*.92);
+      alpha=1-t*.8;
+    }
+    ctx.save();ctx.globalAlpha=alpha;
+    const bt=currentBall();
+    if(ball.attached&&selectedBallType==='sticky'&&!ball.onGreen){
+      ctx.strokeStyle='rgba(157,255,113,.84)';ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(ball.x,drawY,r+4,0,Math.PI*2);ctx.stroke();
+    }
+    ctx.fillStyle=bt.color;ctx.strokeStyle=(selectedBallType==='standard'?'#111820':bt.stroke);ctx.lineWidth=(selectedBallType==='standard'?3.2:2.4);ctx.beginPath();ctx.arc(ball.x,drawY,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,.15)';for(const a of [0,.9,1.8,2.7,3.6,4.5,5.4]){ctx.beginPath();ctx.arc(ball.x+Math.cos(a)*r*.5,drawY+Math.sin(a)*r*.5,Math.max(.6,r*.13),0,Math.PI*2);ctx.fill()}
+    ctx.restore();
+  }
+
+  function drawPuttGuide(){
+    if(!playing||paused||!guideEnabled||power<2||ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    const prediction=puttPreview();if(!prediction)return;
+    const p=prediction.green,py=p.y-BALL_R;
+    const showX=prediction.offGreen?prediction.edge:prediction.stopX;
+    const label=prediction.offGreen?'OFF GREEN':'EST. STOP';
+    const color=prediction.offGreen?'#ffcf65':'#ffffff';
+    ctx.save();
+    // A short dashed trail and a transparent ball outline; the flag stays visible.
+    ctx.strokeStyle=color;ctx.globalAlpha=.83;ctx.lineWidth=3;
+    ctx.setLineDash([9,7]);ctx.beginPath();ctx.moveTo(ball.x,py-13);ctx.lineTo(showX,py-13);ctx.stroke();ctx.setLineDash([]);
+    ctx.globalAlpha=.7;ctx.fillStyle=color;ctx.beginPath();ctx.arc(showX,py,BALL_R+2,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;ctx.strokeStyle='#244336';ctx.lineWidth=2;ctx.beginPath();ctx.arc(showX,py,BALL_R+2,0,Math.PI*2);ctx.stroke();
+    const tx=clamp(showX,65,W-65),ty=Math.max(32,py-40);
+    ctx.font='bold 15px system-ui';ctx.textAlign='center';
+    const tw=ctx.measureText(label).width+18;
+    ctx.fillStyle='rgba(24,53,44,.9)';ctx.beginPath();ctx.roundRect(tx-tw/2,ty-16,tw,23,7);ctx.fill();
+    ctx.fillStyle='#ffffff';ctx.fillText(label,tx,ty);
+    ctx.restore();
+  }
+
+
+  function drawFlightPreview(){
+    if(!playing||paused||!guideEnabled||ball.moving||ball.sinking||ball.lost||ball.holed||puttingMode()||power<4)return;
+    const bt=currentBall();
+    const launchSpeed=(160+power*7)*bt.launch;
+    let x=ball.x+Math.cos(angle)*(BALL_R+4), y=ball.y+Math.sin(angle)*(BALL_R+4);
+    let vx=Math.cos(angle)*launchSpeed, vy=Math.sin(angle)*launchSpeed;
+    const grav=GRAVITY*bt.gravity;
+    ctx.save();ctx.lineCap='round';ctx.setLineDash([4,7]);ctx.lineWidth=3;
+    ctx.strokeStyle='rgba(20,43,51,.85)';ctx.beginPath();ctx.moveTo(x,y);
+    let lastX=x,lastY=y;
+    for(let i=1;i<=22;i++){
+      const dt=.075; x+=vx*dt; y+=vy*dt; vy+=grav*dt; vx*=1-.045*dt;
+      if(i%2===0)ctx.lineTo(x,y);
+      if(x<10||x>W-10||y<8||y>H-20)break;
+      // Stop the preview at the first likely terrain top crossing.
+      let hit=false;
+      for(const g of currentHole().terrainGroups||[]){
+        if(x>=g.x&&x<=g.x+g.w){const top=terrainCenterY(smoothTerrain(g,x));if(lastY<=top&&y>=top){hit=true;break;}}
+      }
+      if(hit)break;
+      lastX=x;lastY=y;
+    }
+    ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#ffdf43';ctx.strokeStyle='#1c343a';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(lastX,lastY,4,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
+  }
+
+  function drawAim(){
+    if(ball.moving||ball.sinking||ball.lost||ball.holed||!playing||paused)return;
+    const len=puttingMode()?68:94+power*.70;
+    const ux=Math.cos(angle),uy=Math.sin(angle);
+    const sx=ball.x+ux*15,sy=ball.y+uy*15;
+    const ex=ball.x+ux*len,ey=ball.y+uy*len;
+    ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+    // A dark outline and vivid amber centre remain visible on bright grass,
+    // pale skies, snow, sand, water and the dark volcanic world.
+    ctx.strokeStyle='rgba(20,39,48,.96)';ctx.lineWidth=12;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex-ux*9,ey-uy*9);ctx.stroke();
+    ctx.strokeStyle='#ffde40';ctx.lineWidth=7;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex-ux*9,ey-uy*9);ctx.stroke();
+    const tip=23,wing=11;
+    ctx.beginPath();ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-ux*tip-uy*wing,ey-uy*tip+ux*wing);
+    ctx.lineTo(ex-ux*tip+uy*wing,ey-uy*tip-ux*wing);
+    ctx.closePath();ctx.fillStyle='#ffdb35';ctx.fill();
+    ctx.strokeStyle='#173440';ctx.lineWidth=4.5;ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw(){
+    drawBackground();
+    const h=currentHole();
+    drawWaterfall(h);
+    for(const g of h.terrainGroups)if(!g.isGreen)drawLandmass(g);
+    const flatGreen=h.terrainGroups.at(-1);
+    if(flatGreen?.isGreen)drawLandmass(flatGreen);
+    for(const p of h.platforms){
+      if(p.terrainSegment||p.isCrate)continue;
+      if(p.isBridge)drawBridge(p);else drawPlatform(p);
+    }
+    for(const p of h.platforms)if(p.bouncePad)drawBouncePad(p);
+    for(const p of h.platforms)if(p.isCrate)drawCrate(p);
+    // Arrows indicate the next route; never cover the cup or the ball.
+    for(const p of h.transitions)if(!p.motion&&!p.isBridge)drawDirectionSign(p.x+p.w*.5,p.y-9,p.dir||1);
+    const sx=h.start.x+h.firstDirection*62;
+    const first=h.tiers[0];
+    if(sx>first.x+29&&sx<first.x+first.w-29)drawDirectionSign(sx,h.start.y-8,h.firstDirection);
+    drawCup();drawFlightPreview();drawPuttGuide();drawAim();drawBall();drawLossEffect();
+  }
+
+  function circleRectCollision(p){
+    if(p.isSlope)return circleSlopeCollision(p);
+    const nx=clamp(ball.x,p.x,p.x+p.w),ny=clamp(ball.y,p.y,p.y+p.h),dx=ball.x-nx,dy=ball.y-ny;
+    return dx*dx+dy*dy<BALL_R*BALL_R?{nx,ny,dx,dy}:null;
+  }
+
+  // PHYSICS REBUILD v1 — a single state machine. The ball changes type only
+  // when the player deliberately takes a shot, never from a physics callback.
+  // ready -> flight -> terrain/ledge/putting -> ready, or flight -> stuck/lost.
+  const FIXED_STEP=1/120;
+  const FAIRWAY_FRICTION=125;
+  const FAIRWAY_DAMPING=1.5;
+  const STATIC_FRICTION=170;
+  const REST_VELOCITY=9;
+  let engineState='ready',physicsDebt=0,rollingElapsed=0;
+  let supportedLedge=null;
+
+  // Render and physics use the same smooth top line, independent of the
+  // decorative 15px rock facets. A continuous normal eliminates seam jolts.
+  function smoothTerrain(g,x){
+    const pts=g.points,xx=clamp(x,pts[0].x,pts.at(-1).x);
+    let lo=0,hi=pts.length-2;
+    while(lo<hi){const mid=(lo+hi)>>1;if(pts[mid+1].x<xx)lo=mid+1;else hi=mid;}
+    const a=pts[lo],b=pts[lo+1],d=Math.max(.001,b.x-a.x);
+    const before=pts[Math.max(0,lo-1)],after=pts[Math.min(pts.length-1,lo+2)];
+    const m0=(b.y-before.y)/Math.max(.001,b.x-before.x);
+    const m1=(after.y-a.y)/Math.max(.001,after.x-a.x);
+    const t=clamp((xx-a.x)/d,0,1),t2=t*t,t3=t2*t;
+    const y=(2*t3-3*t2+1)*a.y+(t3-2*t2+t)*d*m0+
+      (-2*t3+3*t2)*b.y+(t3-t2)*d*m1;
+    const slope=((6*t2-6*t)*a.y+(3*t2-4*t+1)*d*m0+
+      (-6*t2+6*t)*b.y+(3*t2-2*t)*d*m1)/d;
+    return {x:xx,y,slope:clamp(slope,-1.4,1.4)};
+  }
+  const terrainCenterY=point=>point.y-BALL_R*Math.hypot(1,point.slope);
+  const groupFor=id=>currentHole().terrainGroups.find(g=>g.id===id);
+  const pieceAt=(g,x)=>g.pieces.find(p=>x>=p.x-.2&&x<=p.x+p.w+.2)||null;
+
+  function snapReady(reason='Ready for next shot'){
+    if(engineState==='ready'||engineState==='sinking'||engineState==='lost')return;
+    engineState='ready';ball.moving=false;ball.vx=0;ball.vy=0;
+    ball.rollSpeed=0;ball.puttingShot=false;restTimer=0;rollingElapsed=0;
+    lastSafe={x:ball.x,y:ball.y,onGreen:!!ball.onGreen,
+      attached:ball.attached||null,rollGroup:ball.rollGroup};
+    prepareNextShot(reason);
+  }
+  function stickTo(x,y,face,platform=null){
+    ball.x=x;ball.y=y;ball.vx=ball.vy=0;ball.rollSpeed=0;
+    ball.moving=false;ball.grounded=face==='top'||face==='slope';
+    ball.rollGroup=null;ball.attached=face;ball.attachedPlatform=platform;
+    ball.restingPlatform=platform;engineState='stuck';
+    lastSafe={x,y,onGreen:false,attached:face,rollGroup:null};
+    prepareNextShot(`Stuck to ${face} · aim and hit`);
+  }
+  function enterTerrain(g,at,incomingVx,incomingVy){
+    const t=at.slope,L=Math.hypot(1,t);
+    const along=(incomingVx+t*incomingVy)/L;
+    ball.rollGroup=g.id;ball.rollSpeed=clamp(along,-MAX_SPEED,MAX_SPEED);
+    ball.x=at.x;ball.y=terrainCenterY(at);
+    ball.grounded=true;ball.attached=null;ball.attachedPlatform=null;
+    ball.restingPlatform=pieceAt(g,ball.x);
+    ball.vx=ball.rollSpeed/L;ball.vy=ball.vx*t;
+    rollingElapsed=restTimer=0;engineState='terrain';
+    if(g.isGreen&&!ball.onGreen)activatePuttingGreen();
+  }
+  function enterLedge(p){
+    ball.y=p.y-BALL_R;ball.vy=0;
+    ball.grounded=true;ball.rollGroup=null;ball.rollSpeed=null;
+    ball.attached=null;ball.restingPlatform=p;supportedLedge=p;
+    restTimer=0;rollingElapsed=0;engineState='ledge';
+  }
+  function leaveTerrain(g,at,x){
+    const L=Math.hypot(1,at.slope),v=ball.rollSpeed||0;
+    ball.x=x;ball.y=terrainCenterY(at);
+    ball.vx=v/L;ball.vy=ball.vx*at.slope;
+    ball.grounded=false;ball.rollGroup=null;ball.rollSpeed=null;
+    if(g.isGreen)ball.onGreen=false;
+    ball.ignoreTerrainGroup=g.id;ball.ignoreTerrainTime=.15;
+    engineState='flight';restTimer=0;
+  }
+  function springFrom(p){
+    launchBouncePad(p);engineState='flight';supportedLedge=null;
+    ball.ignoreTerrainGroup=p.terrainGroup??null;
+    ball.ignoreTerrainTime=.14;
+  }
+
+  function advanceTerrain(dt){
+    const g=groupFor(ball.rollGroup);
+    if(!g){ball.rollGroup=null;engineState='flight';return;}
+    rollingElapsed+=dt;
+    const point=smoothTerrain(g,ball.x),L=Math.hypot(1,point.slope);
+    let v=Number.isFinite(ball.rollSpeed)?ball.rollSpeed:0;
+    const downhill=GRAVITY*point.slope/L;
+    const friction=ball.onGreen?158:currentTheme().surface==='Soft sand'?180:
+      currentTheme().surface==='Slippery snow'?95:FAIRWAY_FRICTION;
+    const staticFriction=ball.onGreen?193:currentTheme().surface==='Slippery snow'?123:STATIC_FRICTION;
+    if(Math.abs(v)<REST_VELOCITY&&Math.abs(downhill)<=staticFriction){
+      v=0;
+    }else{
+      const direction=Math.abs(v)>REST_VELOCITY?Math.sign(v):Math.sign(downhill);
+      const a=downhill-friction*direction-FAIRWAY_DAMPING*v;
+      const next=v+a*dt;
+      v=(Math.sign(next)!==Math.sign(v)&&Math.abs(downhill)<=staticFriction)?0:next;
+      if(Math.abs(v)<REST_VELOCITY&&Math.abs(downhill)<=staticFriction)v=0;
+    }
+    v=clamp(v,-MAX_SPEED,MAX_SPEED);
+    const nextX=ball.x+v/L*dt;
+    if(nextX<g.x+EDGE_INSET||nextX>g.x+g.w-EDGE_INSET){
+      const edgeX=clamp(nextX,g.x+EDGE_INSET,g.x+g.w-EDGE_INSET);
+      ball.rollSpeed=v;leaveTerrain(g,smoothTerrain(g,edgeX),edgeX);
+      return;
+    }
+    const next=smoothTerrain(g,nextX);
+    ball.x=nextX;ball.y=terrainCenterY(next);
+    const nextL=Math.hypot(1,next.slope);
+    ball.rollSpeed=v;ball.vx=v/nextL;ball.vy=ball.vx*next.slope;
+    const p=pieceAt(g,ball.x);
+    ball.restingPlatform=p;
+    if(p?.bouncePad&&onBouncePad(p)&&!ball.onGreen){springFrom(p);return;}
+    if((p?.isGreen||g.isGreen)&&!ball.onGreen)activatePuttingGreen();
+    if(checkCup())return;
+    if(v===0){
+      restTimer+=dt;
+      if(restTimer>.14){snapReady(ball.onGreen?'Ready for next putt':'Ready for next shot');return;}
+    }else restTimer=0;
+    // A safety stop is *not* allowed to reshuffle or restart the shot.
+    if(rollingElapsed>12){snapReady('Ready — take your next shot');}
+  }
+
+  function advanceLedge(dt){
+    const p=supportedLedge;
+    if(!p){engineState='flight';ball.grounded=false;return;}
+    const friction=ball.onGreen?158:145;
+    const old=ball.vx;
+    if(Math.abs(old)<=friction*dt)ball.vx=0;
+    else ball.vx=old-Math.sign(old)*friction*dt;
+    ball.x+=(old+ball.vx)*.5*dt;
+    ball.y=p.y-BALL_R;ball.vy=0;
+    if(ball.x<p.x+EDGE_INSET||ball.x>p.x+p.w-EDGE_INSET){
+      engineState='flight';ball.grounded=false;supportedLedge=null;return;
+    }
+    if(p.bouncePad&&onBouncePad(p)&&!ball.onGreen){springFrom(p);return;}
+    if(checkCup())return;
+    if(ball.vx===0){restTimer+=dt;if(restTimer>.15)snapReady('Ready for next shot');}
+    else restTimer=0;
+  }
+
+  function enterCup(){
+    if(ball.sinking||ball.holed||ball.lost)return false;
+    ++respawnSerial;engineState='sinking';
+    ball.sinking=true;ball.moving=false;ball.puttingShot=false;
+    ball.rollGroup=null;ball.vx=ball.vy=0;
+    ball.x=currentHole().cup.x;ball.y=cupSurfaceY()-BALL_R;
+    ball.sinkStart=performance.now();
+    const currentRound=roundSerial,currentHoleIndex=holeIndex,token=respawnSerial;
+    setTimeout(()=>{
+      if(!playing||roundSerial!==currentRound||holeIndex!==currentHoleIndex||respawnSerial!==token||!ball.sinking)return;
+      ball.sinking=false;ball.holed=true;completeHole();
+    },450);
+    return true;
+  }
+  function checkCup(){
+    if(ball.cupPassMissed||ball.sinking||ball.holed||ball.lost||!ball.onGreen)return false;
+    const cup=currentHole().cup;
+    if(Math.abs(ball.x-cup.x)>PUTT_CUP_RADIUS+BALL_R*.32)return false;
+    if(Math.abs(ball.y-(cupSurfaceY()-BALL_R))>5)return false;
+    if(Math.abs(ball.vx)>PUTT_CUP_MAX_SPEED||Math.abs(ball.vy)>75){
+      ball.cupPassMissed=true;return false;
+    }
+    return enterCup();
+  }
+  function loseBall(){
+    if(ball.lost||ball.sinking||ball.holed)return;
+    engineState='lost';ball.lost=true;ball.moving=false;ball.vx=ball.vy=0;
+    ball.attached=null;ball.rollGroup=null;ball.puttingShot=false;
+    const th=currentTheme();
+    lossEffect={kind:th.hazardKind,x:clamp(ball.x,34,W-34),y:H-th.hazardDepth+8,start:performance.now(),color:th.effectColor};
+    showMessage(th.lossText,850);
+    const thisRound=roundSerial,thisHole=holeIndex,token=++respawnSerial;
+    setTimeout(()=>{
+      if(!playing||roundSerial!==thisRound||holeIndex!==thisHole||respawnSerial!==token)return;
+      ball.x=lastSafe.x;ball.y=lastSafe.y;ball.vx=ball.vy=0;
+      ball.moving=false;ball.rollGroup=lastSafe.rollGroup??null;ball.rollSpeed=0;
+      ball.attached=lastSafe.attached||null;ball.onGreen=!!lastSafe.onGreen;
+      ball.grounded=true;ball.sinking=false;ball.lost=false;ball.cupPassMissed=false;
+      ball.restingPlatform=supportPlatform();supportedLedge=ball.rollGroup===null?ball.restingPlatform:null;
+      engineState='ready';prepareNextShot('Ready after hazard');
+      updateHud();
+    },700);
+  }
+
+  function circleSlopeCollision(p){
+    const poly=[[p.x,p.y],[p.x+p.w,p.y+p.dy],[p.x+p.w,p.y+p.dy+p.h],[p.x,p.y+p.h]];
+    let closest=null,minDist2=Infinity;
+    for(let k=0;k<4;k++){
+      const a=poly[k],b=poly[(k+1)%4],dx=b[0]-a[0],dy=b[1]-a[1];
+      const t=clamp(((ball.x-a[0])*dx+(ball.y-a[1])*dy)/(dx*dx+dy*dy),0,1);
+      const qx=a[0]+dx*t,qy=a[1]+dy*t,d2=(ball.x-qx)**2+(ball.y-qy)**2;
+      if(d2<minDist2){minDist2=d2;const L=Math.hypot(dx,dy);closest={face:k,qx,qy,nx:dy/L,ny:-dx/L,d2};}
+    }
+    return minDist2<(BALL_R+.3)**2?closest:null;
+  }
+  function advanceFlight(dt){
+    const oldX=ball.x,oldY=ball.y;
+    const bt=movementBall(),sticky=selectedBallType==='sticky'&&!ball.onGreen;
+    ball.vy+=GRAVITY*bt.gravity*dt;
+    ball.vx*=1-.045*dt;
+    ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+    if(ball.ignoreTerrainTime>0)ball.ignoreTerrainTime=Math.max(0,ball.ignoreTerrainTime-dt);
+    if(ball.y+BALL_R>H-currentTheme().hazardDepth+4){loseBall();return;}
+    if(ball.x<BALL_R+8||ball.x>W-BALL_R-8){
+      const left=ball.x<BALL_R+8;
+      if(sticky){stickTo(left?BALL_R+8:W-BALL_R-8,ball.y,left?'left wall':'right wall');return;}
+      ball.x=left?BALL_R+8:W-BALL_R-8;ball.vx=-ball.vx*.57;
+    }
+    if(ball.y<BALL_R+8){
+      if(sticky){stickTo(ball.x,BALL_R+8,'ceiling');return;}
+      ball.y=BALL_R+8;ball.vy=Math.abs(ball.vy)*.48;
+    }
+    // Terrain tops and cliff sides are tested from the previous substep.
+    const groups=currentHole().terrainGroups||[];
+    for(const g of groups){
+      const within=ball.x>=g.x+EDGE_INSET&&ball.x<=g.x+g.w-EDGE_INSET;
+      const ignored=g.id===ball.ignoreTerrainGroup&&ball.ignoreTerrainTime>0;
+      // A cliff is a solid side even when the ball centre is still outside
+      // the landmass. Resolve the *approached* edge, not the opposite one.
+      if(!ignored){
+        const crossesLeft=oldX+BALL_R<=g.x+1&&ball.x+BALL_R>=g.x;
+        const crossesRight=oldX-BALL_R>=g.x+g.w-1&&ball.x-BALL_R<=g.x+g.w;
+        if(crossesLeft||crossesRight){
+          const edge=crossesLeft?g.x:g.x+g.w;
+          const topY=terrainY(g,edge),bottomY=topY+(g.depth||40);
+          if(ball.y>topY+BALL_R*.65&&ball.y<bottomY+BALL_R*.35){
+            if(sticky){stickTo(crossesLeft?edge-BALL_R:edge+BALL_R,ball.y,
+              crossesLeft?'left side':'right side');return;}
+            ball.x=crossesLeft?edge-BALL_R:edge+BALL_R;
+            ball.vx=-ball.vx*.46;return;
+          }
+        }
+      }
+      if(within&&!ignored){
+        const at=smoothTerrain(g,ball.x),prev=smoothTerrain(g,clamp(oldX,g.x,g.x+g.w));
+        const top=terrainCenterY(at),prevTop=terrainCenterY(prev);
+        const into=ball.vy-ball.vx*at.slope;
+        if(oldY<=prevTop+2&&ball.y>=top&&into>0){
+          const p=pieceAt(g,ball.x);
+          if(p?.bouncePad&&onBouncePad(p)&&!ball.onGreen){springFrom(p);return;}
+          if(sticky&&!g.isGreen){stickTo(ball.x,top,'slope',p);return;}
+          if(g.isGreen&&!ball.onGreen)activatePuttingGreen();
+          const impact=into/Math.hypot(1,at.slope);
+          const hop=g.isGreen?greenLandingRebound(g.greenPiece,impact):0;
+          if(hop){ball.y=top;ball.vy=hop;ball.vx*=.92;return;}
+          enterTerrain(g,at,ball.vx,ball.vy);
+          return;
+        }
+        const bottom=terrainY(g,ball.x)+(g.depth||40);
+        if(oldY>=bottom+BALL_R&&ball.y<bottom+BALL_R){
+          if(sticky){stickTo(ball.x,bottom+BALL_R,'underside');return;}
+          ball.y=bottom+BALL_R;ball.vy=Math.abs(ball.vy)*.43;return;
+        }
+      }
+    }
+    // Bonus islands, bridges, crates and moving platforms. Terrain segment
+    // colliders are intentionally excluded: only the smooth group surface
+    // controls the ball on those landforms.
+    for(const p of currentHole().platforms){
+      if(p.terrainSegment)continue;
+      const hit=circleRectCollision(p);
+      if(!hit)continue;
+      const top=oldY+BALL_R<=p.y+2&&ball.vy>0&&ball.x>=p.x+EDGE_INSET&&ball.x<=p.x+p.w-EDGE_INSET;
+      const below=oldY-BALL_R>=p.y+p.h-2;
+      const left=oldX+BALL_R<=p.x+2;
+      const right=oldX-BALL_R>=p.x+p.w-2;
+      if(top){
+        if(p.bouncePad&&onBouncePad(p)&&!ball.onGreen){springFrom(p);return;}
+        if(sticky&&!p.isGreen){stickTo(ball.x,p.y-BALL_R,'top',p);return;}
+        if(p.isGreen&&!ball.onGreen)activatePuttingGreen();
+        enterLedge(p);return;
+      }
+      if(below){
+        if(sticky){stickTo(ball.x,p.y+p.h+BALL_R,'underside',p);return;}
+        ball.y=p.y+p.h+BALL_R;ball.vy=Math.abs(ball.vy)*.38;return;
+      }
+      if(left||right){
+        if(sticky){stickTo(left?p.x-BALL_R:p.x+p.w+BALL_R,ball.y,left?'left side':'right side',p);return;}
+        ball.x=left?p.x-BALL_R:p.x+p.w+BALL_R;ball.vx*=-.50;return;
+      }
+      // Grazing a corner while moving upward should not latch or teleport.
+    }
+  }
+  function advancePutt(dt){
+    const g=cupPlatform();
+    if(!g){ball.puttingShot=false;engineState='flight';return;}
+    const dir=Math.sign(ball.vx);
+    if(!dir){ball.puttingShot=false;ball.rollGroup=currentHole().terrainGroups.at(-1)?.id??null;
+      engineState='terrain';snapReady('Ready for next putt');return;}
+    const startSpeed=Math.abs(ball.vx);
+    const time=Math.min(dt,startSpeed/PUTT_DECELERATION);
+    const distance=startSpeed*time-.5*PUTT_DECELERATION*time*time;
+    const endSpeed=Math.max(0,startSpeed-PUTT_DECELERATION*time);
+    const oldX=ball.x,nextX=ball.x+dir*distance,cupX=currentHole().cup.x;
+    const entry=cupX-dir*PUTT_CUP_RADIUS;
+    const crossing=dir*(cupX-oldX)>0 && dir*(entry-oldX)<=distance && dir*(entry-oldX)>=-.01;
+    const alreadyInside=dir*(cupX-oldX)>0&&Math.abs(oldX-cupX)<=PUTT_CUP_RADIUS;
+    if(!ball.cupPassMissed&&(crossing||alreadyInside)){
+      const travel=Math.max(0,dir*(entry-oldX));
+      const atCup=Math.sqrt(Math.max(0,startSpeed*startSpeed-2*PUTT_DECELERATION*travel));
+      if(atCup<=PUTT_CUP_MAX_SPEED){enterCup();return;}
+      ball.cupPassMissed=true;
+    }
+    ball.x=nextX;ball.y=g.y-BALL_R;ball.vx=dir*endSpeed;ball.vy=0;
+    if(nextX<g.x+EDGE_INSET||nextX>g.x+g.w-EDGE_INSET){
+      ball.puttingShot=false;ball.grounded=false;ball.rollGroup=null;ball.onGreen=false;engineState='flight';return;
+    }
+    if(endSpeed===0){
+      ball.rollGroup=currentHole().terrainGroups.at(-1)?.id??null;
+      ball.puttingShot=false;ball.grounded=true;engineState='terrain';snapReady('Ready for next putt');
+    }
+  }
+  function physics(dt){
+    if(!playing||paused||!ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    physicsDebt=Math.min(physicsDebt+dt,.05);
+    while(physicsDebt>=FIXED_STEP){
+      physicsDebt-=FIXED_STEP;
+      if(engineState==='flight')advanceFlight(FIXED_STEP);
+      else if(engineState==='terrain')advanceTerrain(FIXED_STEP);
+      else if(engineState==='ledge')advanceLedge(FIXED_STEP);
+      else if(engineState==='putting')advancePutt(FIXED_STEP);
+      else break;
+      if(!ball.moving||ball.sinking||ball.lost||ball.holed)break;
+      if(![ball.x,ball.y,ball.vx,ball.vy].every(Number.isFinite)){
+        resetBall();break;
+      }
+    }
+  }
+
+  function hitBall(){
+    if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    // Zero power means no shot. A very quick tap must not cost a stroke.
+    if(power<2){power=0;updatePower();return;}
+    const putting=puttingMode();
+    // The previous ball remains unchanged while resting. Choose the next
+    // type only on an intentional release of HIT (one new type per shot).
+    if(!ballTypeReadyForShot){
+      selectedBallType=randomNextBallKey(lastPlayedBallType||selectedBallType);
+      ballTypeReadyForShot=true;
+    }
+    strokes++;shotSerial++;flightSeconds=0;terrainRollElapsed=0;
+    ball.restingPlatform=null;
+    lastPlayedBallType=selectedBallType;
+    ball.cupPassMissed=false;
+    ball.rollGroup=null;ball.rollSpeed=null;ball.rollReversals=0;ball.lastRollDirection=0;
+    ball.ignoreTerrainTime=0;ball.ignoreTerrainGroup=null;
+    if(putting){
+      // On the cup platform every shot is a horizontal distance-controlled putt.
+      const dir=Math.cos(angle)<0?-1:1;
+      activatePuttingGreen();
+      // The power gauge means *distance*, not a moving target based on cup
+      // proximity. 100% covers approximately the entire green's width,
+      // 50% half, etc., on an unobstructed flat surface. Full power may
+      // roll beyond the lip and off the green: the player must judge range.
+      const green=cupPlatform();
+      const desiredTravel=green.w*(power/100);
+      const sp=Math.sqrt(2*PUTT_DECELERATION*desiredTravel);
+      ball.vx=dir*sp;ball.vy=0;ball.grounded=true;
+      ball.puttingShot=true;
+    }else{
+      ball.puttingShot=false;
+      const sp=(160+power*7)*currentBall().launch;
+      ball.vx=Math.cos(angle)*sp;ball.vy=Math.sin(angle)*sp;ball.grounded=false;
+    }
+    engineState=putting?'putting':'flight';physicsDebt=rollingElapsed=0;supportedLedge=null;
+    ball.moving=true;ball.attached=null;ball.attachedPlatform=null;ball.lost=false;ball.sinking=false;restTimer=0;
+    power=0;updatePower();updateHud();
+  }
+
+  function holeResultLabel(diff){
+    return diff<=-3?'Albatross!':diff===-2?'Eagle!':diff===-1?'Birdie!':diff===0?'Par!':diff===1?'Bogey!':`+${diff}`;
+  }
+
+  function showHoleVictory(diff){
+    const h=currentHole();
+    const finalHole=holeIndex===holes.length-1;
+    holeWinTitle.textContent=finalHole?'Final Hole Complete!':'Hole Complete!';
+    holeWinResult.textContent=holeResultLabel(diff);
+    holeWinDetails.textContent=`${strokes} ${strokes===1?'stroke':'strokes'} · Par ${h.par}`;
+    startCard.style.display='none';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
+    holeWinCard.style.display='block';overlay.classList.remove('hidden');
+  }
+
+  function completeHole(){
+    const h=currentHole(),diff=strokes-h.par;
+    totalScore+=diff;results.push({hole:holeIndex+1,par:h.par,strokes,diff});
+    // Keep the ball permanently hidden after it drops into the cup.
+    ball.holed=true;ball.sinking=false;ball.moving=false;ball.vx=ball.vy=0;
+    showHoleVictory(diff);
+    const finishedHole=holeIndex,finishedRound=roundSerial,completionToken=respawnSerial;
+    setTimeout(()=>{
+      if(!playing||holeIndex!==finishedHole||roundSerial!==finishedRound||respawnSerial!==completionToken)return;
+      holeWinCard.style.display='none';
+      if(holeIndex>=holes.length-1)finishRound();
+      else{holeIndex++;loadHole(holeIndex,true);overlay.classList.add('hidden')}
+    },1550);
+  }
+
+  function finishRound(){
+    playing=false;
+    endTitle.textContent='Victory!';
+    finalScoreBanner.textContent=`Final score ${scoreText(totalScore)}`;
+    endSummary.textContent=`You completed all 9 holes on ${difficultySettings[selectedDifficulty].label} difficulty. The next round reshuffles all nine routes, slopes and scenery, with a different ball type for every shot.`;
+    scoreGrid.innerHTML='';
+    for(const r of results){const d=document.createElement('div');d.className='scorecell';d.innerHTML=`Hole ${r.hole}<strong>${r.strokes}</strong>Par ${r.par}`;scoreGrid.appendChild(d)}
+    startCard.style.display='none';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='block';overlay.classList.remove('hidden');
+  }
+
+  function showBallSelection(idx){
+    holeIndex=idx;choosingBall=false;
+    ballCard.style.display='none';
+    overlay.classList.add('hidden');
+  }
+
+  function chooseBall(type){
+    selectedBallType=type;
+  }
+
+  function startGame(){
+    ++roundSerial;++respawnSerial;shotSerial=0;preparedShotSerial=0;flightSeconds=0;
+    ballTypeReadyForShot=true;terrainRollElapsed=0;
+    holes=generateCourse(selectedDifficulty);
+    results=[];totalScore=0;holeIndex=0;playing=true;paused=false;lastPlayedBallType=null;selectedBallType='standard';
+    startCard.style.display='none';ballCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';
+    overlay.classList.add('hidden');
+    loadHole(0,true);
+    // Start directly into play; course and ball details stay in the fixed HUD.
+  }
+
+  function toTitle(){playing=false;paused=false;choosingBall=false;startCard.style.display='block';ballCard.style.display='none';holeWinCard.style.display='none';pauseCard.style.display='none';endCard.style.display='none';overlay.classList.remove('hidden')}
+
+  function resetBall(){
+    if(!playing||paused||choosingBall||ball.holed)return;
+    respawnSerial++;flightSeconds=0;
+    engineState='ready';physicsDebt=rollingElapsed=0;supportedLedge=null;
+    const h=currentHole(),fallback=h.terrainGroups?.[0];
+    const valid=Number.isFinite(lastSafe.x)&&Number.isFinite(lastSafe.y);
+    const x=valid?lastSafe.x:h.start.x;
+    const y=valid?lastSafe.y:terrainCenterY(smoothTerrain(fallback,h.start.x));
+    ball.x=x;ball.y=y;ball.vx=ball.vy=0;ball.moving=false;
+    ball.rollGroup=valid?(lastSafe.rollGroup??null):(fallback?.id??null);
+    ball.rollSpeed=0;ball.rollReversals=0;ball.attached=valid?(lastSafe.attached||null):null;
+    ball.grounded=true;ball.onGreen=valid?!!lastSafe.onGreen:false;
+    ball.sinking=false;ball.lost=false;ball.puttingShot=false;ball.cupPassMissed=false;
+    ball.ignoreTerrainGroup=null;ball.ignoreTerrainTime=0;restTimer=0;
+    ball.restingPlatform=ball.rollGroup===null?supportPlatform():null;
+    terrainRollElapsed=0;preparedShotSerial=shotSerial;
+    if(shotSerial>0)ballTypeReadyForShot=false;
+    // A reset isn't a new shot: never shuffle the ball type here.
+    updateHud();
+  }
+  function adjustAngle(delta){
+    if(!playing||paused||ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    if(puttingMode()){
+      angle=delta<0?Math.PI:0;
+      updateControlMode();updatePower();
+      return;
+    }
+    angle+=delta;angle=clamp(angle,-Math.PI+.08,Math.PI-.08);
+    const degrees=Math.round(Math.atan2(-Math.sin(angle),Math.abs(Math.cos(angle)))*180/Math.PI);
+    dirHud.textContent=`Aim ${degrees}° ${Math.cos(angle)<0?'←':'→'}`;
+  }
+
+  function beginCharge(e){if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;e.preventDefault();charging=true;power=0;updatePower();chargeStart=performance.now();hitBtn.setPointerCapture?.(e.pointerId);chargeLoop()}
+  function chargeLoop(){if(!charging)return;const t=(performance.now()-chargeStart)/1000;power=Math.min(100,t*75);updatePower();chargeRAF=requestAnimationFrame(chargeLoop)}
+  function releaseCharge(e){if(!charging)return;e?.preventDefault();charging=false;if(chargeRAF)cancelAnimationFrame(chargeRAF);chargeRAF=null;power=Math.min(100,(performance.now()-chargeStart)/1000*75);updatePower();hitBall()}
+
+  let aimHold=null;
+  function startAim(dir,e){e.preventDefault();adjustAngle(dir*.07);clearInterval(aimHold);aimHold=setInterval(()=>adjustAngle(dir*.045),55)}
+  function stopAim(){clearInterval(aimHold);aimHold=null}
+
+  leftBtn.addEventListener('pointerdown',e=>startAim(-1,e));rightBtn.addEventListener('pointerdown',e=>startAim(1,e));
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>{leftBtn.addEventListener(ev,stopAim);rightBtn.addEventListener(ev,stopAim)});
+  hitBtn.addEventListener('pointerdown',beginCharge);hitBtn.addEventListener('pointerup',releaseCharge);hitBtn.addEventListener('pointercancel',()=>{charging=false;if(chargeRAF)cancelAnimationFrame(chargeRAF);chargeRAF=null;power=0;updatePower()});
+  resetBtn.addEventListener('click',resetBall);
+  guideToggle.addEventListener('click',()=>{guideEnabled=!guideEnabled;guideToggle.setAttribute('aria-pressed',String(guideEnabled));guideToggle.textContent=guideEnabled?'Guide: On':'Guide: Off';});
+  pauseBtn.addEventListener('click',()=>{if(!playing||choosingBall)return;paused=true;startCard.style.display='none';ballCard.style.display='none';endCard.style.display='none';pauseCard.style.display='block';overlay.classList.remove('hidden')});
+  continueBtn.addEventListener('click',()=>{paused=false;pauseCard.style.display='none';overlay.classList.add('hidden')});
+  restartHoleBtn.addEventListener('click',()=>{paused=false;pauseCard.style.display='none';overlay.classList.add('hidden');loadHole(holeIndex,true)});
+  difficultyBtns.forEach(b=>b.addEventListener('click',()=>setDifficulty(b.dataset.difficulty)));
+  ballBtns.forEach(b=>b.addEventListener('click',()=>chooseBall(b.dataset.ball)));
+  titleBtn.addEventListener('click',toTitle);endMenuBtn.addEventListener('click',toTitle);startBtn.addEventListener('click',startGame);againBtn.addEventListener('click',startGame);
+
+  canvas.addEventListener('pointerdown',e=>{
+    if(!playing||paused||choosingBall||ball.moving||ball.sinking||ball.lost||ball.holed)return;
+    const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+    if(puttingMode()){
+      angle=x<ball.x?Math.PI:0;
+      updateControlMode();updatePower();
+    }else{
+      angle=Math.atan2(y-ball.y,x-ball.x);
+      const degrees=Math.round(Math.atan2(-Math.sin(angle),Math.abs(Math.cos(angle)))*180/Math.PI);
+      dirHud.textContent=`Aim ${degrees}° ${Math.cos(angle)<0?'←':'→'}`;
+    }
+  });
+
+  let consecutiveFrameErrors=0;
+  function frame(t){
+    const dt=Math.min(.04,Math.max(0,(t-lastTime)/1000));lastTime=t;
+    try{
+      if(playing&&!paused&&!ball.lost&&!ball.holed&&!ball.sinking&&ball.moving){
+        flightSeconds+=dt;
+        if(![ball.x,ball.y,ball.vx,ball.vy].every(Number.isFinite)||flightSeconds>25){
+          resetBall();showMessage('Ball recovered — take your next shot',1200);
+        }
+      }else flightSeconds=0;
+      updateMovingPlatforms(dt);physics(dt);draw();
+      consecutiveFrameErrors=0;
+    }catch(error){
+      console.error('Bounce Golf recovered from an unexpected error:',error);
+      consecutiveFrameErrors++;
+      if(consecutiveFrameErrors===1&&playing){
+        resetBall();showMessage('Ball reset after a physics error',1800);
+      }else if(consecutiveFrameErrors>=3){
+        playing=false;paused=true;pauseCard.style.display='block';overlay.classList.remove('hidden');
+        message.textContent='Please restart this hole';
+      }
+    }finally{requestAnimationFrame(frame)}
+  }
+  holes=generateCourse(selectedDifficulty);setDifficulty(selectedDifficulty);loadHole(0,true);initDynamicPlatforms();draw();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
